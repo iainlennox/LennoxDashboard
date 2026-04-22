@@ -291,6 +291,11 @@
       to   { transform: rotate(0.8deg); }
     }
 
+    .link-item[draggable="true"] { cursor: grab; }
+    .link-item[draggable="true"]:active { cursor: grabbing; }
+    .link-item.dragging { opacity: 0.35; }
+    .link-item.drag-over > a { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
     /* add button */
     #add-link-btn {
       display: flex;
@@ -748,6 +753,8 @@
 
     const STORAGE_KEY = "quicklinks_v1";
 
+    let dragSrcIndex = null;
+
     function loadLinks() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -798,6 +805,35 @@
 
         item.appendChild(a);
         item.appendChild(removeBtn);
+
+        // drag-to-reorder
+        item.draggable = true;
+        item.addEventListener("dragstart", (e) => {
+          dragSrcIndex = i;
+          e.dataTransfer.effectAllowed = "move";
+          setTimeout(() => item.classList.add("dragging"), 0);
+        });
+        item.addEventListener("dragend", () => {
+          item.classList.remove("dragging");
+          grid.querySelectorAll(".link-item").forEach(el => el.classList.remove("drag-over"));
+        });
+        item.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          grid.querySelectorAll(".link-item").forEach(el => el.classList.remove("drag-over"));
+          item.classList.add("drag-over");
+        });
+        item.addEventListener("drop", (e) => {
+          e.preventDefault();
+          item.classList.remove("drag-over");
+          if (dragSrcIndex === null || dragSrcIndex === i) return;
+          const links = loadLinks();
+          const [moved] = links.splice(dragSrcIndex, 1);
+          links.splice(i, 0, moved);
+          saveLinks(links);
+          renderLinks();
+        });
+
         grid.appendChild(item);
       });
 
