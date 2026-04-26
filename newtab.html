@@ -53,8 +53,7 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-right: none;
-      border-left: none;
-      border-radius: 0;
+      border-radius: var(--radius) 0 0 var(--radius);
       color: var(--text);
       outline: none;
       transition: border-color 0.2s;
@@ -63,11 +62,18 @@
     #search-input::placeholder { color: var(--muted); }
     #search-input:focus { border-color: var(--accent); }
 
+    .engine-selector {
+      position: relative;
+      flex-shrink: 0;
+      display: flex;
+    }
+
     #search-btn {
-      padding: 16px 24px;
+      padding: 16px 20px;
       background: var(--accent);
       border: 1px solid var(--accent);
-      border-radius: 0 var(--radius) var(--radius) 0;
+      border-right: none;
+      border-radius: 0;
       color: #fff;
       font-size: 16px;
       cursor: pointer;
@@ -77,37 +83,28 @@
       gap: 6px;
     }
 
-    #search-btn:hover { background: var(--accent-hover); }
-
-    .engine-selector {
-      position: relative;
-      flex-shrink: 0;
-    }
+    #search-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
     #engine-btn {
-      height: 100%;
       padding: 16px 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-right: none;
-      border-radius: var(--radius) 0 0 var(--radius);
-      color: var(--muted);
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-left: 1px solid rgba(255,255,255,0.2);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: #fff;
       font-size: 13px;
-      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-      transition: color 0.2s, background 0.2s;
+      transition: background 0.2s;
     }
 
-    #engine-btn:hover { color: var(--text); background: var(--border); }
+    #engine-btn:hover { background: var(--accent-hover); }
 
     .engine-dropdown {
       position: absolute;
       top: calc(100% + 4px);
-      left: 0;
+      right: 0;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -137,9 +134,15 @@
 <body>
   <h1>New Tab</h1>
   <form id="search-form" action="https://www.google.com/search" method="GET">
+    <input id="search-input" type="text" name="q" placeholder="Search Google…" autofocus autocomplete="off" />
     <div class="engine-selector">
+      <button id="search-btn" type="submit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Search
+      </button>
       <button type="button" id="engine-btn">
-        <span id="engine-label">Google</span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div id="engine-dropdown" class="engine-dropdown hidden">
@@ -147,13 +150,6 @@
         <button type="button" id="opt-duckduckgo" onclick="setEngine('duckduckgo')">DuckDuckGo</button>
       </div>
     </div>
-    <input id="search-input" type="text" name="q" placeholder="Search Google…" autofocus autocomplete="off" />
-    <button id="search-btn" type="submit">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      Search
-    </button>
   </form>
 
   <script>
@@ -166,7 +162,6 @@
       const engine = ENGINES[name];
       document.getElementById('search-form').action = engine.action;
       document.getElementById('search-input').placeholder = engine.placeholder;
-      document.getElementById('engine-label').textContent = engine.label;
       document.getElementById('engine-dropdown').classList.add('hidden');
       document.querySelectorAll('.engine-dropdown button').forEach(b => b.classList.remove('active'));
       const opt = document.getElementById('opt-' + name);
