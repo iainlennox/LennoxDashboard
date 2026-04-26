@@ -170,7 +170,8 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-right: none;
-      border-radius: var(--radius) 0 0 var(--radius);
+      border-left: none;
+      border-radius: 0;
       color: var(--text);
       outline: none;
       transition: border-color 0.2s;
@@ -197,6 +198,60 @@
     }
 
     #search-btn:hover { background: var(--accent-hover); }
+
+    .engine-selector {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    #engine-btn {
+      height: 100%;
+      padding: 16px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-right: none;
+      border-radius: var(--radius) 0 0 var(--radius);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      transition: color 0.2s, background 0.2s;
+    }
+
+    #engine-btn:hover { color: var(--text); background: var(--border); }
+
+    .engine-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      z-index: 100;
+      min-width: 150px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    .engine-dropdown button {
+      display: block;
+      width: 100%;
+      padding: 10px 16px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .engine-dropdown button:hover { background: var(--border); }
+    .engine-dropdown button.active { color: var(--accent); }
+    .engine-dropdown.hidden { display: none; }
 
     /* ── Refresh button ── */
     #refresh-btn {
@@ -587,8 +642,18 @@
         <button id="refresh-btn" onclick="fetchWeather()">↻ refresh</button>
       </div>
 
-      <!-- Google Search -->
+      <!-- Search -->
       <form id="search-form" action="https://www.google.com/search" method="GET" target="_self">
+        <div class="engine-selector">
+          <button type="button" id="engine-btn">
+            <span id="engine-label">Google</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="engine-dropdown" class="engine-dropdown hidden">
+            <button type="button" id="opt-google" onclick="setEngine('google')">Google</button>
+            <button type="button" id="opt-duckduckgo" onclick="setEngine('duckduckgo')">DuckDuckGo</button>
+          </div>
+        </div>
         <input id="search-input" type="text" name="q" placeholder="Search Google…" autofocus autocomplete="off" />
         <button id="search-btn" type="submit">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -729,6 +794,38 @@
     updateClock();
     setInterval(updateClock, 1000);
     setInterval(fetchWeather, 10 * 60 * 1000); // refresh weather every 10 min
+
+    // ══════════════════════════════════════════════
+    //  SEARCH ENGINE SELECTOR
+    // ══════════════════════════════════════════════
+    const ENGINES = {
+      google:     { action: 'https://www.google.com/search', placeholder: 'Search Google…',     label: 'Google' },
+      duckduckgo: { action: 'https://duckduckgo.com/',       placeholder: 'Search DuckDuckGo…', label: 'DuckDuckGo' }
+    };
+
+    function setEngine(name) {
+      const engine = ENGINES[name];
+      document.getElementById('search-form').action = engine.action;
+      document.getElementById('search-input').placeholder = engine.placeholder;
+      document.getElementById('engine-label').textContent = engine.label;
+      document.getElementById('engine-dropdown').classList.add('hidden');
+      document.querySelectorAll('.engine-dropdown button').forEach(b => b.classList.remove('active'));
+      const opt = document.getElementById('opt-' + name);
+      if (opt) opt.classList.add('active');
+      localStorage.setItem('searchEngine', name);
+    }
+
+    document.getElementById('engine-btn').addEventListener('click', () => {
+      document.getElementById('engine-dropdown').classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.engine-selector')) {
+        document.getElementById('engine-dropdown').classList.add('hidden');
+      }
+    });
+
+    setEngine(localStorage.getItem('searchEngine') || 'google');
 
     // Focus search on any keypress (unless already focused)
     document.addEventListener("keydown", (e) => {
