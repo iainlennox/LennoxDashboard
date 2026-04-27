@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Home</title>
   <style>
-    /* ── CONFIG: paste your OpenWeatherMap key on line ~160 ── */
-
     :root {
       --bg: #0f1117;
       --surface: #1a1d27;
@@ -606,9 +604,114 @@
       text-align: center;
       padding: 12px 0;
     }
+
+    /* ── Settings Button ── */
+    #settings-btn {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+      z-index: 50;
+      line-height: 1;
+    }
+    #settings-btn:hover { color: var(--text); background: var(--surface); }
+
+    /* ── Settings Modal ── */
+    #settings-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #settings-overlay.open { display: flex; }
+
+    #settings-modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px 32px;
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #settings-modal h3 {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .settings-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .settings-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .settings-field label { font-size: 12px; color: var(--muted); }
+
+    .settings-field input {
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .settings-field input:focus { border-color: var(--accent); }
+
+    .settings-field input[type="password"] { letter-spacing: 0.1em; }
+
+    .settings-row {
+      display: flex;
+      gap: 10px;
+      min-width: 0;
+    }
+    .settings-row .settings-field { flex: 1; min-width: 0; }
+    .settings-row .settings-field--narrow { flex: 0 0 80px; }
+
+    #settings-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
+
+  <button id="settings-btn" onclick="openSettings()" title="Settings">⚙️</button>
 
   <div id="greeting"></div>
   <div id="clock"></div>
@@ -632,7 +735,7 @@
         </div>
         <div id="weather-error"></div>
         <div id="api-key-hint" style="display:none">
-          Add your free API key at the top of this file.<br>
+          Add your API key via the <button onclick="openSettings()" style="background:none;border:none;color:var(--accent);cursor:pointer;padding:0;font-size:inherit;text-decoration:underline">⚙️ Settings</button> button.<br>
           Get one free at <a href="https://home.openweathermap.org/users/sign_up" target="_blank">openweathermap.org</a>
           — takes about 2 minutes.
         </div>
@@ -690,6 +793,44 @@
 
   </div><!-- /page-layout -->
 
+  <!-- Settings Modal -->
+  <div id="settings-overlay">
+    <div id="settings-modal">
+      <h3>⚙️ Settings</h3>
+
+      <div class="settings-section">
+        <div class="settings-section-title">General</div>
+        <div class="settings-field">
+          <label for="settings-name">Your name (used in greeting)</label>
+          <input id="settings-name" type="text" placeholder="e.g. Iain" maxlength="40" />
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Weather</div>
+        <div class="settings-field">
+          <label for="settings-apikey">OpenWeatherMap API key</label>
+          <input id="settings-apikey" type="password" placeholder="Paste your API key here" />
+        </div>
+        <div class="settings-row">
+          <div class="settings-field">
+            <label for="settings-city">City</label>
+            <input id="settings-city" type="text" placeholder="e.g. Glasgow" maxlength="60" />
+          </div>
+          <div class="settings-field settings-field--narrow">
+            <label for="settings-country">Country</label>
+            <input id="settings-country" type="text" placeholder="e.g. GB" maxlength="4" />
+          </div>
+        </div>
+      </div>
+
+      <div id="settings-actions">
+        <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
+        <button class="btn-save" onclick="saveSettings()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Link Modal -->
   <div id="modal-overlay">
     <div id="modal">
@@ -711,11 +852,51 @@
 
   <script>
     // ══════════════════════════════════════════════
-    //  CONFIGURATION — edit these two values
+    //  SETTINGS  (stored in localStorage)
     // ══════════════════════════════════════════════
-    const API_KEY  = "45a8daea4274e108a01d13347cf0e08f";   // OpenWeatherMap key
-    const CITY     = "Glasgow";             // <-- change city if needed
-    const COUNTRY  = "GB";                  // <-- ISO country code
+    const SETTINGS_KEY = "dashboard_settings_v1";
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch { return {}; }
+    }
+
+    function getSettingValue(key, fallback) {
+      return loadSettings()[key] || fallback;
+    }
+
+    function openSettings() {
+      const s = loadSettings();
+      document.getElementById("settings-name").value    = s.name    || "";
+      document.getElementById("settings-apikey").value  = s.apiKey  || "";
+      document.getElementById("settings-city").value    = s.city    || "";
+      document.getElementById("settings-country").value = s.country || "";
+      document.getElementById("settings-overlay").classList.add("open");
+      setTimeout(() => document.getElementById("settings-name").focus(), 50);
+    }
+
+    function closeSettings() {
+      document.getElementById("settings-overlay").classList.remove("open");
+    }
+
+    function saveSettings() {
+      const s = {
+        name:    document.getElementById("settings-name").value.trim(),
+        apiKey:  document.getElementById("settings-apikey").value.trim(),
+        city:    document.getElementById("settings-city").value.trim(),
+        country: document.getElementById("settings-country").value.trim().toUpperCase(),
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+      closeSettings();
+      updateClock();
+      fetchWeather();
+    }
+
+    document.getElementById("settings-overlay").addEventListener("click", (e) => {
+      if (e.target === document.getElementById("settings-overlay")) closeSettings();
+    });
     // ══════════════════════════════════════════════
 
     const WEATHER_ICONS = {
@@ -732,7 +913,11 @@
       hintEl.style.display = "none";
       card.classList.add("loading");
 
-      if (!API_KEY || API_KEY === "YOUR_API_KEY_HERE") {
+      const apiKey  = getSettingValue("apiKey",  "");
+      const city    = getSettingValue("city",    "Glasgow");
+      const country = getSettingValue("country", "GB");
+
+      if (!apiKey) {
         card.classList.remove("loading");
         document.getElementById("weather-icon").textContent = "🔑";
         document.getElementById("weather-temp").textContent = "--°";
@@ -742,7 +927,7 @@
       }
 
       try {
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(CITY)},${COUNTRY}&appid=${API_KEY}&units=metric`;
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)},${country}&appid=${apiKey}&units=metric`;
         const res  = await fetch(url);
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const d = await res.json();
@@ -778,7 +963,8 @@
       const now = new Date();
       const hour = now.getHours();
       const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-      document.getElementById("greeting").textContent = `${greeting}, Iain`;
+      const name = getSettingValue("name", "");
+      document.getElementById("greeting").textContent = name ? `${greeting}, ${name}` : greeting;
       document.getElementById("clock").textContent = now.toLocaleString("en-GB", {
         weekday:"long", day:"numeric", month:"long",
         hour:"2-digit", minute:"2-digit"
