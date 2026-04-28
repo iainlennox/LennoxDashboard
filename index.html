@@ -1160,22 +1160,36 @@
       const ts    = Date.now();
       const keywords = WALLPAPER_THEMES[theme];
       if (!keywords) return `https://picsum.photos/1920/1080?t=${ts}`;
-      return `https://source.unsplash.com/1920x1080/?${encodeURIComponent(keywords)}&sig=${ts}`;
+      // keywords contain commas — don't encode them, Unsplash Source needs plain CSV
+      return `https://source.unsplash.com/1920x1080/?${keywords}&sig=${ts}`;
     }
 
-    function refreshWallpaper() {
+    function applyWallpaperImage(src) {
       const el = document.getElementById("wallpaper");
-      const overlay = document.getElementById("wallpaper-overlay");
       el.classList.remove("loaded");
       const img = new Image();
       img.onload = () => {
         el.style.backgroundImage = `url(${img.src})`;
         el.classList.add("loaded");
       };
-      img.src = getWallpaperUrl();
+      img.onerror = () => {
+        // Themed source failed — fall back to random Picsum
+        const fallback = new Image();
+        fallback.onload = () => {
+          el.style.backgroundImage = `url(${fallback.src})`;
+          el.classList.add("loaded");
+        };
+        fallback.src = `https://picsum.photos/1920/1080?t=${Date.now()}`;
+      };
+      img.src = src;
+    }
+
+    function refreshWallpaper() {
+      const overlay = document.getElementById("wallpaper-overlay");
       document.body.classList.add("has-wallpaper");
       overlay.style.display = "block";
       document.getElementById("wallpaper-btn").style.display = "block";
+      applyWallpaperImage(getWallpaperUrl());
     }
 
     function disableWallpaper() {
