@@ -154,6 +154,44 @@
     #api-key-hint a { color: var(--accent); text-decoration: none; }
     #api-key-hint a:hover { text-decoration: underline; }
 
+    /* ── Weather Forecast Strip ── */
+    #weather-forecast {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .forecast-day {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      max-width: 80px;
+    }
+
+    .forecast-day-name {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .forecast-icon { font-size: 24px; line-height: 1; }
+
+    .forecast-temps {
+      font-size: 13px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .forecast-high { font-weight: 600; }
+    .forecast-low  { color: var(--muted); }
+
     /* ── Search Box ── */
     #search-form {
       width: 100%;
@@ -734,6 +772,7 @@
           <span>👁 <span id="weather-feels">--</span></span>
         </div>
         <div id="weather-error"></div>
+        <div id="weather-forecast"></div>
         <div id="api-key-hint" style="display:none">
           Add your API key via the <button onclick="openSettings()" style="background:none;border:none;color:var(--accent);cursor:pointer;padding:0;font-size:inherit;text-decoration:underline">⚙️ Settings</button> button.<br>
           Get one free at <a href="https://home.openweathermap.org/users/sign_up" target="_blank">openweathermap.org</a>
@@ -927,8 +966,11 @@
       }
 
       try {
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)},${country}&appid=${apiKey}&units=metric`;
-        const res  = await fetch(url);
+        const baseQ  = `q=${encodeURIComponent(city)},${country}&appid=${apiKey}&units=metric`;
+        const [res, fRes] = await Promise.all([
+          fetch(`https://api.openweathermap.org/data/2.5/weather?${baseQ}`),
+          fetch(`https://api.openweathermap.org/data/2.5/forecast?${baseQ}&cnt=40`)
+        ]);
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const d = await res.json();
 
@@ -947,6 +989,41 @@
         document.getElementById("weather-humidity").textContent = `${humid}% humidity`;
         document.getElementById("weather-wind").textContent     = `${wind} km/h wind`;
         document.getElementById("weather-feels").textContent    = `Feels ${feels}°`;
+
+        // 3-day forecast
+        if (fRes.ok) {
+          const fd = await fRes.json();
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const days = {};
+          for (const item of fd.list) {
+            const dateStr = item.dt_txt.slice(0, 10);
+            if (dateStr === todayStr) continue; // skip today
+            if (!days[dateStr]) days[dateStr] = { temps: [], icons: [] };
+            days[dateStr].temps.push(item.main.temp);
+            days[dateStr].icons.push(item.weather[0].icon);
+          }
+          const forecastEl = document.getElementById("weather-forecast");
+          forecastEl.innerHTML = "";
+          Object.entries(days).slice(0, 3).forEach(([dateStr, info]) => {
+            const high = Math.round(Math.max(...info.temps));
+            const low  = Math.round(Math.min(...info.temps));
+            // pick the most common icon for the day
+            const iconCode = info.icons.sort((a, b) =>
+              info.icons.filter(x => x === b).length - info.icons.filter(x => x === a).length
+            )[0];
+            const dayEmoji = WEATHER_ICONS[iconCode] || "🌡️";
+            const dayName  = new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short" });
+            forecastEl.insertAdjacentHTML("beforeend", `
+              <div class="forecast-day">
+                <span class="forecast-day-name">${dayName}</span>
+                <span class="forecast-icon">${dayEmoji}</span>
+                <span class="forecast-temps">
+                  <span class="forecast-high">${high}°</span>
+                  <span class="forecast-low">${low}°</span>
+                </span>
+              </div>`);
+          });
+        }
 
       } catch (e) {
         errEl.textContent = "Could not load weather. Check API key or connection.";
