@@ -860,6 +860,17 @@
       max-height: 80px;
       opacity: 1;
     }
+
+    /* ── Splash animations ── */
+    @keyframes widget-in {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+
+    .widget-animate {
+      opacity: 0;
+      animation: widget-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
   </style>
 </head>
 <body>
@@ -970,6 +981,10 @@
           <label for="settings-wallpaper">Background wallpaper</label>
           <input id="settings-wallpaper" type="checkbox" onchange="document.getElementById('wallpaper-theme-row').classList.toggle('visible', this.checked)" />
         </div>
+        <div class="settings-toggle-row">
+          <label for="settings-effects">✨ Page animations</label>
+          <input id="settings-effects" type="checkbox" />
+        </div>
         <div id="wallpaper-theme-row">
           <div class="settings-field">
             <label for="settings-wallpaper-theme">Image theme</label>
@@ -1058,7 +1073,8 @@
     }
 
     function getSettingValue(key, fallback) {
-      return loadSettings()[key] || fallback;
+      const s = loadSettings();
+      return key in s ? s[key] : fallback;
     }
 
     function openSettings() {
@@ -1070,6 +1086,7 @@
       document.getElementById("settings-wallpaper").checked      = !!s.wallpaper;
       document.getElementById("settings-wallpaper-theme").value  = s.wallpaperTheme || "random";
       document.getElementById("settings-wallpaper-lock").checked = !!s.wallpaperLock;
+      document.getElementById("settings-effects").checked        = s.effects !== false; // default on
       document.getElementById("wallpaper-theme-row").classList.toggle("visible", !!s.wallpaper);
       document.getElementById("settings-overlay").classList.add("open");
       setTimeout(() => document.getElementById("settings-name").focus(), 50);
@@ -1092,7 +1109,8 @@
         wallpaper:      document.getElementById("settings-wallpaper").checked,
         wallpaperTheme: document.getElementById("settings-wallpaper-theme").value,
         wallpaperLock:  lockingNow,
-        wallpaperSeed:  prevSettings.wallpaperSeed || null, // preserve existing seed
+        wallpaperSeed:  prevSettings.wallpaperSeed || null,
+        effects:        document.getElementById("settings-effects").checked,
       };
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
       closeSettings();
@@ -1227,6 +1245,24 @@
     function initWallpaper() {
       if (getSettingValue("wallpaper", false)) refreshWallpaper();
     }
+
+    function initEffects() {
+      if (getSettingValue("effects", true) === false) return;
+      const widgets = [
+        { id: "greeting",      delay: 0   },
+        { id: "clock",         delay: 60  },
+        { id: "weather-card",  delay: 130 },
+        { id: "search-form",   delay: 220 },
+        { id: "links-section", delay: 310 },
+        { id: "notes-card",    delay: 180 },
+      ];
+      widgets.forEach(({ id, delay }) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.animationDelay = `${delay}ms`;
+        el.classList.add("widget-animate");
+      });
+    }
     // ══════════════════════════════════════════════
 
     const WEATHER_ICONS = {
@@ -1343,6 +1379,7 @@
     fetchWeather();
     updateClock();
     initWallpaper();
+    initEffects();
     setInterval(updateClock, 1000);
     setInterval(fetchWeather, 10 * 60 * 1000); // refresh weather every 10 min
 
