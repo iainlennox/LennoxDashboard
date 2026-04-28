@@ -983,6 +983,10 @@
               <option value="abstract">🔷 Abstract &amp; Minimal</option>
             </select>
           </div>
+          <div class="settings-toggle-row" style="margin-top:6px">
+            <label for="settings-wallpaper-lock">🔒 Keep current image</label>
+            <input id="settings-wallpaper-lock" type="checkbox" />
+          </div>
         </div>
       </div>
 
@@ -1059,12 +1063,13 @@
 
     function openSettings() {
       const s = loadSettings();
-      document.getElementById("settings-name").value          = s.name           || "";
-      document.getElementById("settings-apikey").value        = s.apiKey         || "";
-      document.getElementById("settings-city").value          = s.city           || "";
-      document.getElementById("settings-country").value       = s.country        || "";
-      document.getElementById("settings-wallpaper").checked   = !!s.wallpaper;
-      document.getElementById("settings-wallpaper-theme").value = s.wallpaperTheme || "random";
+      document.getElementById("settings-name").value             = s.name           || "";
+      document.getElementById("settings-apikey").value           = s.apiKey         || "";
+      document.getElementById("settings-city").value             = s.city           || "";
+      document.getElementById("settings-country").value          = s.country        || "";
+      document.getElementById("settings-wallpaper").checked      = !!s.wallpaper;
+      document.getElementById("settings-wallpaper-theme").value  = s.wallpaperTheme || "random";
+      document.getElementById("settings-wallpaper-lock").checked = !!s.wallpaperLock;
       document.getElementById("wallpaper-theme-row").classList.toggle("visible", !!s.wallpaper);
       document.getElementById("settings-overlay").classList.add("open");
       setTimeout(() => document.getElementById("settings-name").focus(), 50);
@@ -1075,9 +1080,10 @@
     }
 
     function saveSettings() {
-      const prevSettings   = loadSettings();
+      const prevSettings    = loadSettings();
       const wallpaperWasOff = !prevSettings.wallpaper;
       const themeChanged    = prevSettings.wallpaperTheme !== document.getElementById("settings-wallpaper-theme").value;
+      const lockingNow      = document.getElementById("settings-wallpaper-lock").checked;
       const s = {
         name:           document.getElementById("settings-name").value.trim(),
         apiKey:         document.getElementById("settings-apikey").value.trim(),
@@ -1085,12 +1091,16 @@
         country:        document.getElementById("settings-country").value.trim().toUpperCase(),
         wallpaper:      document.getElementById("settings-wallpaper").checked,
         wallpaperTheme: document.getElementById("settings-wallpaper-theme").value,
+        wallpaperLock:  lockingNow,
+        wallpaperSeed:  prevSettings.wallpaperSeed || null, // preserve existing seed
       };
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
       closeSettings();
       updateClock();
       fetchWeather();
-      if (s.wallpaper && (wallpaperWasOff || themeChanged)) {
+      // refresh image if: wallpaper just turned on, theme changed, OR lock just turned OFF
+      const lockJustRemoved = prevSettings.wallpaperLock && !lockingNow;
+      if (s.wallpaper && (wallpaperWasOff || themeChanged || lockJustRemoved)) {
         refreshWallpaper();
       } else if (!s.wallpaper) {
         disableWallpaper();
@@ -1157,12 +1167,11 @@
       abstract:  "abstract,geometric",
     };
 
-    function getWallpaperUrl() {
+    function getWallpaperUrl(seed) {
       const theme    = getSettingValue("wallpaperTheme", "random");
-      const lock     = Math.floor(Math.random() * 1000000); // different image each call
       const keywords = WALLPAPER_THEMES[theme];
-      if (!keywords) return `https://picsum.photos/1920/1080?t=${lock}`;
-      return `https://loremflickr.com/1920/1080/${keywords}?lock=${lock}`;
+      if (!keywords) return `https://picsum.photos/seed/${seed}/1920/1080`;
+      return `https://loremflickr.com/1920/1080/${keywords}?lock=${seed}`;
     }
 
     function applyWallpaperImage(src) {
@@ -1187,10 +1196,23 @@
 
     function refreshWallpaper() {
       const overlay = document.getElementById("wallpaper-overlay");
+      const s       = loadSettings();
+      const locked  = s.wallpaperLock;
+      const seed    = (locked && s.wallpaperSeed) ? s.wallpaperSeed
+                                                  : Math.floor(Math.random() * 9999999);
+      // persist the seed so the locked image survives page reloads
+      if (!locked || !s.wallpaperSeed) {
+        s.wallpaperSeed = seed;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+      }
       document.body.classList.add("has-wallpaper");
       overlay.style.display = "block";
-      document.getElementById("wallpaper-btn").style.display = "block";
-      applyWallpaperImage(getWallpaperUrl());
+      const btn = document.getElementById("wallpaper-btn");
+      btn.style.display = "block";
+      btn.disabled      = !!locked;
+      btn.style.opacity = locked ? "0.35" : "";
+      btn.title         = locked ? "Image locked — uncheck 'Keep current image' in Settings" : "New wallpaper";
+      applyWallpaperImage(getWallpaperUrl(seed));
     }
 
     function disableWallpaper() {
