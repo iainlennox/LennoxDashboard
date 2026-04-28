@@ -757,6 +757,32 @@
       justify-content: flex-end;
       margin-top: 4px;
     }
+
+    .settings-data-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-data {
+      flex: 1;
+      padding: 8px 10px;
+      font-size: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .btn-data:hover { background: var(--surface); border-color: var(--accent); }
+
+    .btn-data-danger {
+      border-color: #ef5350;
+      color: #ef5350;
+    }
+    .btn-data-danger:hover { background: rgba(239,83,80,0.08); border-color: #ef5350; }
   </style>
 </head>
 <body>
@@ -879,6 +905,16 @@
         </div>
       </div>
 
+      <div class="settings-section">
+        <div class="settings-section-title">Data</div>
+        <div class="settings-data-actions">
+          <button class="btn-data" onclick="exportConfig()">⬇ Export</button>
+          <button class="btn-data" onclick="document.getElementById('import-file').click()">⬆ Import</button>
+          <button class="btn-data btn-data-danger" onclick="clearConfig()">🗑 Clear all</button>
+        </div>
+        <input id="import-file" type="file" accept=".json" style="display:none" onchange="importConfig(event)" />
+      </div>
+
       <div id="settings-actions">
         <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
         <button class="btn-save" onclick="saveSettings()">Save</button>
@@ -952,6 +988,49 @@
     document.getElementById("settings-overlay").addEventListener("click", (e) => {
       if (e.target === document.getElementById("settings-overlay")) closeSettings();
     });
+
+    const CONFIG_KEYS = ["dashboard_settings_v1", "quicklinks_v1", "stickynotes_v1", "searchEngine"];
+
+    function exportConfig() {
+      const data = {};
+      CONFIG_KEYS.forEach(k => {
+        const val = localStorage.getItem(k);
+        if (val !== null) data[k] = val;
+      });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `dashboard-config-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function importConfig(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = evt => {
+        try {
+          const data = JSON.parse(evt.target.result);
+          CONFIG_KEYS.forEach(k => {
+            if (k in data) localStorage.setItem(k, data[k]);
+          });
+          closeSettings();
+          location.reload();
+        } catch {
+          alert("Invalid config file — please choose a valid dashboard export.");
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = ""; // allow re-importing same file
+    }
+
+    function clearConfig() {
+      if (!confirm("Clear all settings, links and notes? This cannot be undone.")) return;
+      CONFIG_KEYS.forEach(k => localStorage.removeItem(k));
+      closeSettings();
+      location.reload();
+    }
     // ══════════════════════════════════════════════
 
     const WEATHER_ICONS = {
