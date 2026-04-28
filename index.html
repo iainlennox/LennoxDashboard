@@ -1146,23 +1146,23 @@
     // ══════════════════════════════════════════════
 
     // ── Wallpaper ──
+    // Themed images use loremflickr.com — free, no key, genuine keyword filtering
     const WALLPAPER_THEMES = {
-      random:   null, // uses Picsum
-      space:    "space,galaxy,cosmos,nebula",
-      nature:   "nature,forest,landscape,trees",
-      mountains:"mountain,alpine,peaks,highland",
-      ocean:    "ocean,sea,beach,waves",
-      city:     "city,architecture,urban,skyline",
-      abstract: "abstract,geometric,minimal,pattern",
+      random:    null,
+      space:     "space,galaxy",
+      nature:    "nature,forest",
+      mountains: "mountain,alpine",
+      ocean:     "ocean,sea",
+      city:      "city,architecture",
+      abstract:  "abstract,geometric",
     };
 
     function getWallpaperUrl() {
-      const theme = getSettingValue("wallpaperTheme", "random");
-      const ts    = Date.now();
+      const theme    = getSettingValue("wallpaperTheme", "random");
+      const lock     = Math.floor(Math.random() * 1000000); // different image each call
       const keywords = WALLPAPER_THEMES[theme];
-      if (!keywords) return `https://picsum.photos/1920/1080?t=${ts}`;
-      // keywords contain commas — don't encode them, Unsplash Source needs plain CSV
-      return `https://source.unsplash.com/1920x1080/?${keywords}&sig=${ts}`;
+      if (!keywords) return `https://picsum.photos/1920/1080?t=${lock}`;
+      return `https://loremflickr.com/1920/1080/${keywords}?lock=${lock}`;
     }
 
     function applyWallpaperImage(src) {
