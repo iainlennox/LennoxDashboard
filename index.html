@@ -783,10 +783,65 @@
       color: #ef5350;
     }
     .btn-data-danger:hover { background: rgba(239,83,80,0.08); border-color: #ef5350; }
+
+    /* ── Wallpaper ── */
+    #wallpaper {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+    #wallpaper.loaded { opacity: 1; }
+
+    #wallpaper-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: rgba(0,0,0,0.52);
+      display: none;
+    }
+
+    body.has-wallpaper { background: transparent; }
+
+    #wallpaper-btn {
+      display: none;
+      position: fixed;
+      top: 16px;
+      right: 62px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+      z-index: 50;
+      line-height: 1;
+    }
+    #wallpaper-btn:hover { color: var(--text); background: var(--surface); }
+
+    /* settings toggle row */
+    .settings-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+    .settings-toggle-row input[type="checkbox"] {
+      width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
+  <div id="wallpaper"></div>
+  <div id="wallpaper-overlay"></div>
+
+  <button id="wallpaper-btn" onclick="refreshWallpaper()" title="New wallpaper">🖼</button>
   <button id="settings-btn" onclick="openSettings()" title="Settings">⚙️</button>
 
   <div id="greeting"></div>
@@ -885,6 +940,10 @@
           <label for="settings-name">Your name (used in greeting)</label>
           <input id="settings-name" type="text" placeholder="e.g. Iain" maxlength="40" />
         </div>
+        <div class="settings-toggle-row">
+          <label for="settings-wallpaper">Background wallpaper (Picsum Photos)</label>
+          <input id="settings-wallpaper" type="checkbox" />
+        </div>
       </div>
 
       <div class="settings-section">
@@ -960,10 +1019,11 @@
 
     function openSettings() {
       const s = loadSettings();
-      document.getElementById("settings-name").value    = s.name    || "";
-      document.getElementById("settings-apikey").value  = s.apiKey  || "";
-      document.getElementById("settings-city").value    = s.city    || "";
-      document.getElementById("settings-country").value = s.country || "";
+      document.getElementById("settings-name").value       = s.name     || "";
+      document.getElementById("settings-apikey").value     = s.apiKey   || "";
+      document.getElementById("settings-city").value       = s.city     || "";
+      document.getElementById("settings-country").value    = s.country  || "";
+      document.getElementById("settings-wallpaper").checked = !!s.wallpaper;
       document.getElementById("settings-overlay").classList.add("open");
       setTimeout(() => document.getElementById("settings-name").focus(), 50);
     }
@@ -973,16 +1033,23 @@
     }
 
     function saveSettings() {
+      const wallpaperWasOff = !getSettingValue("wallpaper", false);
       const s = {
-        name:    document.getElementById("settings-name").value.trim(),
-        apiKey:  document.getElementById("settings-apikey").value.trim(),
-        city:    document.getElementById("settings-city").value.trim(),
-        country: document.getElementById("settings-country").value.trim().toUpperCase(),
+        name:      document.getElementById("settings-name").value.trim(),
+        apiKey:    document.getElementById("settings-apikey").value.trim(),
+        city:      document.getElementById("settings-city").value.trim(),
+        country:   document.getElementById("settings-country").value.trim().toUpperCase(),
+        wallpaper: document.getElementById("settings-wallpaper").checked,
       };
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
       closeSettings();
       updateClock();
       fetchWeather();
+      if (s.wallpaper && wallpaperWasOff) {
+        refreshWallpaper();
+      } else if (!s.wallpaper) {
+        disableWallpaper();
+      }
     }
 
     document.getElementById("settings-overlay").addEventListener("click", (e) => {
@@ -1030,6 +1097,36 @@
       CONFIG_KEYS.forEach(k => localStorage.removeItem(k));
       closeSettings();
       location.reload();
+    }
+    // ══════════════════════════════════════════════
+
+    // ── Wallpaper ──
+    function refreshWallpaper() {
+      const el = document.getElementById("wallpaper");
+      const overlay = document.getElementById("wallpaper-overlay");
+      el.classList.remove("loaded");
+      const img = new Image();
+      img.onload = () => {
+        el.style.backgroundImage = `url(${img.src})`;
+        el.classList.add("loaded");
+      };
+      img.src = `https://picsum.photos/1920/1080?t=${Date.now()}`;
+      document.body.classList.add("has-wallpaper");
+      overlay.style.display = "block";
+      document.getElementById("wallpaper-btn").style.display = "block";
+    }
+
+    function disableWallpaper() {
+      const el = document.getElementById("wallpaper");
+      el.classList.remove("loaded");
+      el.style.backgroundImage = "";
+      document.getElementById("wallpaper-overlay").style.display = "none";
+      document.getElementById("wallpaper-btn").style.display = "none";
+      document.body.classList.remove("has-wallpaper");
+    }
+
+    function initWallpaper() {
+      if (getSettingValue("wallpaper", false)) refreshWallpaper();
     }
     // ══════════════════════════════════════════════
 
@@ -1146,6 +1243,7 @@
     // ── Init ──
     fetchWeather();
     updateClock();
+    initWallpaper();
     setInterval(updateClock, 1000);
     setInterval(fetchWeather, 10 * 60 * 1000); // refresh weather every 10 min
 
