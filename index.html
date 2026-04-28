@@ -686,6 +686,22 @@
     }
     #settings-overlay.open { display: flex; }
 
+    @keyframes modal-in {
+      from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+      to   { opacity: 1; transform: scale(1)    translateY(0);     }
+    }
+    @keyframes overlay-in {
+      from { background: rgba(0,0,0,0); }
+      to   { background: rgba(0,0,0,0.6); }
+    }
+
+    #settings-overlay.open.animating {
+      animation: overlay-in 0.2s ease forwards;
+    }
+    #settings-overlay.open.animating #settings-modal {
+      animation: modal-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
     #settings-modal {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -1088,7 +1104,13 @@
       document.getElementById("settings-wallpaper-lock").checked = !!s.wallpaperLock;
       document.getElementById("settings-effects").checked        = s.effects !== false; // default on
       document.getElementById("wallpaper-theme-row").classList.toggle("visible", !!s.wallpaper);
-      document.getElementById("settings-overlay").classList.add("open");
+      const overlay = document.getElementById("settings-overlay");
+      overlay.classList.remove("animating");
+      overlay.classList.add("open");
+      if (getSettingValue("effects", true) !== false) {
+        void overlay.offsetWidth; // force reflow to restart animation
+        overlay.classList.add("animating");
+      }
       setTimeout(() => document.getElementById("settings-name").focus(), 50);
     }
 
