@@ -834,6 +834,31 @@
     .settings-toggle-row input[type="checkbox"] {
       width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;
     }
+
+    .settings-field select {
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    .settings-field select:focus { border-color: var(--accent); }
+
+    #wallpaper-theme-row {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.25s ease, opacity 0.25s ease;
+    }
+    #wallpaper-theme-row.visible {
+      max-height: 80px;
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -941,8 +966,22 @@
           <input id="settings-name" type="text" placeholder="e.g. Iain" maxlength="40" />
         </div>
         <div class="settings-toggle-row">
-          <label for="settings-wallpaper">Background wallpaper (Picsum Photos)</label>
-          <input id="settings-wallpaper" type="checkbox" />
+          <label for="settings-wallpaper">Background wallpaper</label>
+          <input id="settings-wallpaper" type="checkbox" onchange="document.getElementById('wallpaper-theme-row').classList.toggle('visible', this.checked)" />
+        </div>
+        <div id="wallpaper-theme-row">
+          <div class="settings-field">
+            <label for="settings-wallpaper-theme">Image theme</label>
+            <select id="settings-wallpaper-theme">
+              <option value="random">🎲 Random (Picsum)</option>
+              <option value="space">🚀 Space &amp; Galaxy</option>
+              <option value="nature">🌿 Nature &amp; Forest</option>
+              <option value="mountains">⛰️ Mountains</option>
+              <option value="ocean">🌊 Ocean &amp; Beach</option>
+              <option value="city">🏙️ City &amp; Architecture</option>
+              <option value="abstract">🔷 Abstract &amp; Minimal</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -1019,11 +1058,13 @@
 
     function openSettings() {
       const s = loadSettings();
-      document.getElementById("settings-name").value       = s.name     || "";
-      document.getElementById("settings-apikey").value     = s.apiKey   || "";
-      document.getElementById("settings-city").value       = s.city     || "";
-      document.getElementById("settings-country").value    = s.country  || "";
-      document.getElementById("settings-wallpaper").checked = !!s.wallpaper;
+      document.getElementById("settings-name").value          = s.name           || "";
+      document.getElementById("settings-apikey").value        = s.apiKey         || "";
+      document.getElementById("settings-city").value          = s.city           || "";
+      document.getElementById("settings-country").value       = s.country        || "";
+      document.getElementById("settings-wallpaper").checked   = !!s.wallpaper;
+      document.getElementById("settings-wallpaper-theme").value = s.wallpaperTheme || "random";
+      document.getElementById("wallpaper-theme-row").classList.toggle("visible", !!s.wallpaper);
       document.getElementById("settings-overlay").classList.add("open");
       setTimeout(() => document.getElementById("settings-name").focus(), 50);
     }
@@ -1033,22 +1074,26 @@
     }
 
     function saveSettings() {
-      const wallpaperWasOff = !getSettingValue("wallpaper", false);
+      const prevSettings   = loadSettings();
+      const wallpaperWasOff = !prevSettings.wallpaper;
+      const themeChanged    = prevSettings.wallpaperTheme !== document.getElementById("settings-wallpaper-theme").value;
       const s = {
-        name:      document.getElementById("settings-name").value.trim(),
-        apiKey:    document.getElementById("settings-apikey").value.trim(),
-        city:      document.getElementById("settings-city").value.trim(),
-        country:   document.getElementById("settings-country").value.trim().toUpperCase(),
-        wallpaper: document.getElementById("settings-wallpaper").checked,
+        name:           document.getElementById("settings-name").value.trim(),
+        apiKey:         document.getElementById("settings-apikey").value.trim(),
+        city:           document.getElementById("settings-city").value.trim(),
+        country:        document.getElementById("settings-country").value.trim().toUpperCase(),
+        wallpaper:      document.getElementById("settings-wallpaper").checked,
+        wallpaperTheme: document.getElementById("settings-wallpaper-theme").value,
       };
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
       closeSettings();
       updateClock();
       fetchWeather();
-      if (s.wallpaper && wallpaperWasOff) {
+      if (s.wallpaper && (wallpaperWasOff || themeChanged)) {
         refreshWallpaper();
       } else if (!s.wallpaper) {
         disableWallpaper();
+      }
       }
     }
 
@@ -1101,6 +1146,24 @@
     // ══════════════════════════════════════════════
 
     // ── Wallpaper ──
+    const WALLPAPER_THEMES = {
+      random:   null, // uses Picsum
+      space:    "space,galaxy,cosmos,nebula",
+      nature:   "nature,forest,landscape,trees",
+      mountains:"mountain,alpine,peaks,highland",
+      ocean:    "ocean,sea,beach,waves",
+      city:     "city,architecture,urban,skyline",
+      abstract: "abstract,geometric,minimal,pattern",
+    };
+
+    function getWallpaperUrl() {
+      const theme = getSettingValue("wallpaperTheme", "random");
+      const ts    = Date.now();
+      const keywords = WALLPAPER_THEMES[theme];
+      if (!keywords) return `https://picsum.photos/1920/1080?t=${ts}`;
+      return `https://source.unsplash.com/1920x1080/?${encodeURIComponent(keywords)}&sig=${ts}`;
+    }
+
     function refreshWallpaper() {
       const el = document.getElementById("wallpaper");
       const overlay = document.getElementById("wallpaper-overlay");
@@ -1110,7 +1173,7 @@
         el.style.backgroundImage = `url(${img.src})`;
         el.classList.add("loaded");
       };
-      img.src = `https://picsum.photos/1920/1080?t=${Date.now()}`;
+      img.src = getWallpaperUrl();
       document.body.classList.add("has-wallpaper");
       overlay.style.display = "block";
       document.getElementById("wallpaper-btn").style.display = "block";
