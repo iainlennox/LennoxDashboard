@@ -105,7 +105,32 @@
       transition: opacity 0.3s;
     }
 
-    #weather-card.loading { opacity: 0.5; }
+    /* ── Skeleton shimmer ── */
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position:  400px 0; }
+    }
+
+    .skeleton {
+      border-radius: 6px;
+      background: linear-gradient(90deg, var(--border) 25%, #3a3f5c 50%, var(--border) 75%);
+      background-size: 800px 100%;
+      animation: shimmer 1.4s infinite linear;
+    }
+
+    #weather-skeleton { display: none; }
+    #weather-skeleton.visible { display: block; }
+
+    #weather-content { display: block; }
+    #weather-content.hidden { display: none; }
+
+    .sk-location  { height: 13px; width: 100px; margin: 0 auto 12px; }
+    .sk-main      { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px; }
+    .sk-icon      { height: 48px; width: 48px; border-radius: 50%; }
+    .sk-temp      { height: 52px; width: 80px; border-radius: 8px; }
+    .sk-desc      { height: 14px; width: 130px; margin: 0 auto 14px; }
+    .sk-details   { display: flex; justify-content: center; gap: 20px; margin-bottom: 0; }
+    .sk-detail    { height: 13px; width: 80px; }
 
     #weather-location {
       font-size: 13px;
@@ -915,7 +940,23 @@
     <div id="col-main">
 
       <!-- Weather Card -->
-      <div id="weather-card" class="loading">
+      <div id="weather-card">
+        <!-- Skeleton shown while loading -->
+        <div id="weather-skeleton" class="visible">
+          <div class="skeleton sk-location"></div>
+          <div class="sk-main">
+            <div class="skeleton sk-icon"></div>
+            <div class="skeleton sk-temp"></div>
+          </div>
+          <div class="skeleton sk-desc"></div>
+          <div class="sk-details">
+            <div class="skeleton sk-detail"></div>
+            <div class="skeleton sk-detail"></div>
+            <div class="skeleton sk-detail"></div>
+          </div>
+        </div>
+        <!-- Real content, hidden until data arrives -->
+        <div id="weather-content" class="hidden">
         <div id="weather-location">Glasgow, GB</div>
         <div id="weather-body">
           <div id="weather-current">
@@ -931,6 +972,7 @@
             </div>
           </div>
           <div id="weather-forecast"></div>
+        </div>
         </div>
         <div id="weather-error"></div>
         <div id="api-key-hint" style="display:none">
@@ -1304,19 +1346,23 @@
     };
 
     async function fetchWeather() {
-      const card = document.getElementById("weather-card");
-      const errEl = document.getElementById("weather-error");
-      const hintEl = document.getElementById("api-key-hint");
+      const card     = document.getElementById("weather-card");
+      const skeleton = document.getElementById("weather-skeleton");
+      const content  = document.getElementById("weather-content");
+      const errEl    = document.getElementById("weather-error");
+      const hintEl   = document.getElementById("api-key-hint");
       errEl.textContent = "";
       hintEl.style.display = "none";
-      card.classList.add("loading");
+      skeleton.classList.add("visible");
+      content.classList.add("hidden");
 
       const apiKey  = getSettingValue("apiKey",  "");
       const city    = getSettingValue("city",    "Glasgow");
       const country = getSettingValue("country", "GB");
 
       if (!apiKey) {
-        card.classList.remove("loading");
+        skeleton.classList.remove("visible");
+        content.classList.remove("hidden");
         document.getElementById("weather-icon").textContent = "🔑";
         document.getElementById("weather-temp").textContent = "--°";
         document.getElementById("weather-desc").textContent = "API key needed";
@@ -1385,12 +1431,14 @@
         }
 
       } catch (e) {
-        errEl.textContent = "Could not load weather. Check API key or connection.";
+        content.classList.remove("hidden");
         document.getElementById("weather-icon").textContent = "⚠️";
         document.getElementById("weather-temp").textContent = "--°";
         document.getElementById("weather-desc").textContent = "";
+        errEl.textContent = "Could not load weather. Check API key or connection.";
       } finally {
-        card.classList.remove("loading");
+        skeleton.classList.remove("visible");
+        content.classList.remove("hidden");
       }
     }
 
