@@ -67,6 +67,10 @@ const MOCK_VEHICLE_DATA = {
      - Authenticating with the Volvo Connected Vehicle API
      - Refreshing OAuth tokens (never expose these here)
      - Returning JSON matching the MOCK_VEHICLE_DATA shape
+
+   NOTE: A 404 on /.api/vehicle-status is expected when no Azure
+   Function has been deployed yet.  The browser will log it; that
+   is normal and the dashboard will fall back to mock data.
    ─────────────────────────────────────────────────────────── */
 async function fetchVehicleStatus() {
   try {
@@ -77,15 +81,17 @@ async function fetchVehicleStatus() {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status} from /.api/vehicle-status`);
+      // 404 = Function not yet deployed; any other status = server error.
+      // Both cases fall through to mock data — no action needed.
+      throw new Error(`HTTP ${response.status}`);
     }
 
     const data = await response.json();
     return { data, source: 'live' };
 
   } catch (err) {
-    // API unavailable — fall back to mock data quietly
-    console.warn('[EX30] API unavailable, using mock data:', err.message);
+    // Expected when Azure Function is not deployed — use mock data.
+    console.info('[EX30] /.api/vehicle-status unavailable, using mock data.', err.message);
     return { data: MOCK_VEHICLE_DATA, source: 'mock' };
   }
 }
@@ -364,15 +370,26 @@ function setConnectionStatus(source) {
 
 
 /* ── Refresh ────────────────────────────────────────────────────
-   Called by the REFRESH button (onclick in HTML) and by the
-   auto-refresh interval timer.
+   On the very first load, mock data is rendered immediately so
+   the page is never blank while the API call is in-flight.
+   The API call then happens in the background; if it succeeds
+   the cards are updated with live data.
    ─────────────────────────────────────────────────────────── */
+let _firstLoad = true;
+
 async function refreshData() {
   const btn = document.getElementById('refresh-btn');
   if (btn) btn.classList.add('spinning');
 
-  const { data, source } = await fetchVehicleStatus();
+  // Render mock data straight away on first load — no spinner wait
+  if (_firstLoad) {
+    renderDashboard(MOCK_VEHICLE_DATA);
+    setConnectionStatus('mock');
+    _firstLoad = false;
+  }
 
+  // Fetch from Azure Function in background; update if live data arrives
+  const { data, source } = await fetchVehicleStatus();
   renderDashboard(data);
   setConnectionStatus(source);
 
