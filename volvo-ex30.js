@@ -453,7 +453,7 @@ function initCarViewer() {
   const container = document.getElementById('car-viewer');
   if (!container) return;
 
-  const H = 320;
+  const H = 340;
 
   // ── Scene ──────────────────────────────────────────────────────
   const scene = new THREE.Scene();
@@ -461,8 +461,8 @@ function initCarViewer() {
 
   // ── Camera ─────────────────────────────────────────────────────
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 80);
-  camera.position.set(5.5, 2.6, 5.5);
-  camera.lookAt(0, 0.65, 0);
+  camera.position.set(6.0, 2.8, 6.0);
+  camera.lookAt(0, 0.76, 0);
 
   // ── Renderer ───────────────────────────────────────────────────
   // Three.js creates and owns the canvas so setSize() tracking is clean.
@@ -498,66 +498,72 @@ function initCarViewer() {
 
   // ── Car body — extruded side profile ───────────────────────────
   //
-  //  Coordinate system (all units ≈ metres):
-  //    X = car length  (front = +X, rear = -X)
-  //    Y = height from ground (ground = 0)
-  //    Z = car width   (extruded; centered after translate)
+  //  Proportions measured against real EX30 data:
+  //    Total length  ≈ 4.23 m  → x = -2.12 … +2.12
+  //    Wheelbase     ≈ 2.65 m
+  //    Front overhang≈ 0.84 m  → front wheel x ≈ +1.28
+  //    Rear overhang ≈ 0.74 m  → rear  wheel x ≈ -1.37
+  //    Ride height   ≈ 0.18 m  → sill y ≈ 0.32
+  //    Wheel radius  ≈ 0.32 m  (20" tyre)
+  //    Roof height   ≈ 1.52 m
   //
-  //  Key dimensions:
-  //    Arch centres:  front x=1.30, rear x=-1.10 ; both at y=0.38
-  //    Arch radius:   0.38 → arch bottom ≈ y=0.00 (touches ground)
-  //    Sill (between arches): y=0.38
-  //    Roof peak:     y=1.26
+  //  X = car length (front = +X)   Y = height   Z = width (extruded)
   //
-  //  Profile is traced clockwise (DoubleSide mat handles the inversion).
-  //  absarc with clockwise=true sweeps DOWN from the sill, carving the
-  //  wheel-arch opening into the bottom of the body.
+  //  Profile traced clockwise; DoubleSide material handles the inversion.
+  //  absarc(cx, cy, r, 0, π, true) sweeps CW (DOWN) from (cx+r,cy)
+  //  through the arch trough to (cx-r,cy) — carving the wheel opening.
   // ────────────────────────────────────────────────────────────────
 
   const profile = new THREE.Shape();
 
-  // ── Bottom: front bumper base → wheel arches → rear bumper base ──
-  profile.moveTo( 2.00, 0.00);  // front bumper, ground
-  profile.lineTo( 1.68, 0.00);  // in front of front arch
-  profile.lineTo( 1.68, 0.38);  // rise to sill at arch entry
+  // ── Bottom — front section, arches, sill ──────────────────────
+  profile.moveTo( 2.10, 0.00);   // front bumper, ground level
+  profile.lineTo( 1.66, 0.00);   // run to front arch entry (x-level)
+  profile.lineTo( 1.66, 0.32);   // rise to sill / arch height
 
-  // Front wheel arch — clockwise arc dips down through wheel space
-  // absarc(cx, cy, r, startAngle, endAngle, clockwise)
-  // CW from 0→π : (cx+r, cy) → lowest point (cx, cy-r) → (cx-r, cy)
-  profile.absarc( 1.30, 0.38, 0.38, 0, Math.PI, true);  // ends at (0.92, 0.38)
+  // Front wheel arch  cx=1.28, r=0.38
+  // CW sweep: (1.66,0.32) → lowest (1.28,-0.06) → (0.90,0.32)
+  profile.absarc( 1.28, 0.32, 0.38, 0, Math.PI, true);
 
-  profile.lineTo(-0.72, 0.38);  // sill panel between arches
+  // Sill between arches — EX30 sill is flat and relatively high
+  profile.lineTo(-0.99, 0.32);
 
-  // Rear wheel arch
-  profile.absarc(-1.10, 0.38, 0.38, 0, Math.PI, true);  // ends at (-1.48, 0.38)
+  // Rear wheel arch  cx=-1.37, r=0.38
+  // CW sweep: (-0.99,0.32) → lowest (-1.37,-0.06) → (-1.75,0.32)
+  profile.absarc(-1.37, 0.32, 0.38, 0, Math.PI, true);
 
-  profile.lineTo(-1.48, 0.00);  // drop to ground
-  profile.lineTo(-2.00, 0.00);  // rear bumper, ground
+  profile.lineTo(-1.75, 0.00);   // drop to ground
+  profile.lineTo(-2.10, 0.00);   // rear bumper, ground level
 
-  // ── Rear end ──────────────────────────────────────────────────
-  profile.lineTo(-2.12, 0.15);
-  profile.lineTo(-2.12, 0.46);
-  profile.lineTo(-2.00, 0.62);  // rear upper body
-  profile.lineTo(-1.62, 0.80);
-  profile.lineTo(-1.10, 1.10);  // C-pillar base
+  // ── Rear face — EX30 has fairly upright, boxy tail ────────────
+  profile.lineTo(-2.18, 0.14);
+  profile.lineTo(-2.18, 0.48);   // rear bumper upper
+  profile.lineTo(-2.08, 0.68);   // boot lip / tail lamp centre
+  profile.lineTo(-1.90, 0.88);   // rear body upper
 
-  // ── Roof ──────────────────────────────────────────────────────
-  profile.lineTo(-0.52, 1.26);  // roof peak
-  profile.lineTo( 0.60, 1.22);  // roof slope forward
+  // ── C-pillar — steep drop, signature EX30 look ────────────────
+  profile.lineTo(-1.40, 1.40);   // C-pillar mid
+  profile.lineTo(-0.88, 1.52);   // roof rear edge
+
+  // ── Roof — long and flat (EX30 is a crossover, not fastback) ──
+  profile.lineTo( 0.50, 1.52);   // roof front edge
 
   // ── Windscreen + A-pillar ─────────────────────────────────────
-  profile.lineTo( 0.92, 0.90);  // A-pillar base (top of dash)
-  profile.lineTo( 1.12, 0.70);  // bonnet/scuttle
+  // EX30 A-pillar is upright; screen raked ~58° from horizontal
+  profile.lineTo( 1.05, 1.36);   // A-pillar top (screen-to-roof join)
+  profile.lineTo( 1.18, 0.90);   // A-pillar base (scuttle panel)
 
-  // ── Bonnet + front bumper face ─────────────────────────────────
-  profile.lineTo( 1.86, 0.62);
-  profile.lineTo( 2.12, 0.46);
-  profile.lineTo( 2.12, 0.15);
-  profile.lineTo( 2.00, 0.00);  // close
+  // ── Bonnet — short, slightly domed ────────────────────────────
+  profile.lineTo( 1.30, 0.82);   // bonnet surface at scuttle
+  profile.lineTo( 1.92, 0.72);   // bonnet leading edge / DRL recess
+  profile.lineTo( 2.12, 0.56);   // front face upper
+  profile.lineTo( 2.18, 0.38);   // front bumper upper
+  profile.lineTo( 2.18, 0.14);   // front bumper face
+  profile.lineTo( 2.10, 0.00);   // close back to start
 
-  // Extrude 1.74 m wide, then centre on Z axis
-  const extruded = new THREE.ExtrudeGeometry(profile, { depth: 1.74, bevelEnabled: false });
-  extruded.translate(0, 0, -0.87);
+  // Extrude 1.84 m wide (EX30 is 1837 mm), centred on Z
+  const extruded = new THREE.ExtrudeGeometry(profile, { depth: 1.84, bevelEnabled: false });
+  extruded.translate(0, 0, -0.92);
 
   car.add(new THREE.Mesh(extruded, bodyMat));
 
@@ -565,62 +571,58 @@ function initCarViewer() {
   // on flat surfaces while keeping every real shape boundary visible
   car.add(new THREE.LineSegments(new THREE.EdgesGeometry(extruded, 15), edgeRed));
 
-  // ── Door crease line (both sides) ─────────────────────────────
-  // A single horizontal score line suggesting the door aperture
-  [[0.87], [-0.87]].forEach(([z]) => {
+  // ── Door crease / belt line (both flanks) ─────────────────────
+  // Runs at the body shoulder height along the door panel
+  [0.92, -0.92].forEach(z => {
     const pts = [
-      new THREE.Vector3(-0.98, 0.66, z),
-      new THREE.Vector3( 0.84, 0.66, z),
+      new THREE.Vector3(-1.30, 0.80, z),
+      new THREE.Vector3( 1.05, 0.80, z),
     ];
     car.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), edgeDim));
   });
 
   // ── KITT scanner strip ─────────────────────────────────────────
-  const scanMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 1.12), scannerMat);
-  scanMesh.position.set(2.10, 0.26, 0);
+  const scanMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 1.70), scannerMat);
+  scanMesh.position.set(2.16, 0.28, 0);
   car.add(scanMesh);
 
-  // ── Headlights ─────────────────────────────────────────────────
-  const litGeo = new THREE.BoxGeometry(0.05, 0.06, 0.22);
-  [-0.55, 0.55].forEach(z => {
+  // ── Headlights — thin horizontal strips (EX30 DRL style) ──────
+  const litGeo = new THREE.BoxGeometry(0.05, 0.05, 0.32);
+  [-0.62, 0.62].forEach(z => {
     const h = new THREE.Mesh(litGeo, emitRed);
-    h.position.set(2.10, 0.46, z);
+    h.position.set(2.16, 0.54, z);
     car.add(h);
   });
 
-  // ── Rear lights ────────────────────────────────────────────────
-  // Full-width light bar — a signature EX30 detail
-  const rearBarGeo = new THREE.BoxGeometry(0.04, 0.045, 1.60);
-  const rearBar = new THREE.Mesh(rearBarGeo, emitDim);
-  rearBar.position.set(-2.12, 0.58, 0);
+  // ── Rear light bar — full-width horizontal strip (real EX30) ──
+  const rearBar = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 1.78), emitDim);
+  rearBar.position.set(-2.16, 0.65, 0);
   car.add(rearBar);
 
   // ── Wheels ─────────────────────────────────────────────────────
-  // CylinderGeometry default axis = Y; rotation.x = π/2 → axis along Z
+  // CylinderGeometry default axis = Y; rotation.x = π/2 → axis along Z.
+  // Wheel centres match arch centres: front x=1.28, rear x=-1.37.
   const WHEEL_R = 0.30;
-  const WHEEL_W = 0.20;
+  const WHEEL_W = 0.22;
   const tyreGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, WHEEL_W, 28);
   const hubGeo  = new THREE.CylinderGeometry(0.11, 0.11, WHEEL_W + 0.02, 8);
 
   [
-    [ 1.30, WHEEL_R,  0.87],
-    [ 1.30, WHEEL_R, -0.87],
-    [-1.10, WHEEL_R,  0.87],
-    [-1.10, WHEEL_R, -0.87],
+    [ 1.28, WHEEL_R,  0.92],
+    [ 1.28, WHEEL_R, -0.92],
+    [-1.37, WHEEL_R,  0.92],
+    [-1.37, WHEEL_R, -0.92],
   ].forEach(([x, y, z]) => {
-    // Tyre (dark)
     const tyre = new THREE.Mesh(tyreGeo, new THREE.MeshBasicMaterial({ color: 0x0c0202 }));
     tyre.position.set(x, y, z);
     tyre.rotation.x = Math.PI / 2;
     car.add(tyre);
 
-    // Tyre edge (dim)
     const te = new THREE.LineSegments(new THREE.EdgesGeometry(tyreGeo, 25), edgeDim);
     te.position.set(x, y, z);
     te.rotation.x = Math.PI / 2;
     car.add(te);
 
-    // Hub — bright rim ring
     const hub = new THREE.Mesh(hubGeo, new THREE.MeshBasicMaterial({ color: 0x2a0808 }));
     hub.position.set(x, y, z);
     hub.rotation.x = Math.PI / 2;
