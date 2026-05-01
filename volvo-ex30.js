@@ -388,11 +388,47 @@ function startAutoRefresh() {
 }
 
 
+/* ── Sound Button ────────────────────────────────────────────────
+   Plays the KITT scanner sound on click.
+   Audio is created lazily on first interaction to satisfy
+   browser autoplay policies.
+   ─────────────────────────────────────────────────────────── */
+let kittAudio = null;
+
+function initSound() {
+  if (kittAudio) return;
+  kittAudio = new Audio('sounds/kitt-scanner.mp3');
+  kittAudio.preload = 'auto';
+}
+
+function playKittSound() {
+  initSound();
+  const btn = document.getElementById('sound-btn');
+
+  // Rewind so repeated clicks always play from the start
+  kittAudio.currentTime = 0;
+  kittAudio.play().catch(err => {
+    console.warn('[EX30] Audio play failed:', err.message);
+  });
+
+  // Visual feedback while audio plays
+  if (btn) {
+    btn.classList.add('playing');
+    kittAudio.onended = () => btn.classList.remove('playing');
+  }
+}
+
+
 /* ── Refresh button wiring ───────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('refresh-btn');
   if (btn) {
     btn.addEventListener('click', refreshData);
+  }
+
+  const soundBtn = document.getElementById('sound-btn');
+  if (soundBtn) {
+    soundBtn.addEventListener('click', playKittSound);
   }
 
   // Initial data load + kick off auto-refresh
