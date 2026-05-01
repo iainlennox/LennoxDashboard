@@ -437,13 +437,12 @@ function playKittSound() {
 
 
 /* ── 3D Car Viewer ───────────────────────────────────────────────
-   Builds a Knight Rider-style wireframe/neon model of the EX30
-   using Three.js (loaded from CDN as a global THREE).
+   Builds a Knight Rider-style neon wireframe of the EX30.
 
-   Three.js creates and owns the canvas element so its internal
-   size tracking never conflicts with CSS.  The scene uses only
-   MeshBasicMaterial and LineBasicMaterial — no lights required —
-   so nothing can be "too dark to see".
+   The body uses THREE.ExtrudeGeometry on a 2-D side profile drawn
+   with THREE.Shape, giving a genuine car silhouette (A-pillar,
+   windscreen rake, roofline, C-pillar, wheel arches) rather than
+   stacked boxes.  Three.js r134 global build (local file).
    ─────────────────────────────────────────────────────────── */
 function initCarViewer() {
   if (typeof THREE === 'undefined') {
@@ -454,35 +453,30 @@ function initCarViewer() {
   const container = document.getElementById('car-viewer');
   if (!container) return;
 
-  const H = 300;
+  const H = 320;
 
   // ── Scene ──────────────────────────────────────────────────────
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x060606);
+  scene.background = new THREE.Color(0x050505);
 
   // ── Camera ─────────────────────────────────────────────────────
-  // Aspect is set properly in resize() below
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
-  camera.position.set(4.8, 2.6, 4.8);
-  camera.lookAt(0, 0.8, 0);
+  const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 80);
+  camera.position.set(5.5, 2.6, 5.5);
+  camera.lookAt(0, 0.65, 0);
 
   // ── Renderer ───────────────────────────────────────────────────
-  // Let Three.js create the canvas so it fully controls canvas dimensions.
-  // We then insert it into the DOM and remove the static placeholder.
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  // Three.js creates and owns the canvas so setSize() tracking is clean.
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-  // Swap placeholder canvas for Three.js-managed one
   const placeholder = document.getElementById('car-canvas');
   if (placeholder) placeholder.remove();
   renderer.domElement.id = 'car-canvas';
   renderer.domElement.style.display = 'block';
-  // Insert before HUD labels
   container.insertBefore(renderer.domElement, container.firstChild);
 
-  // ── Resize helper ──────────────────────────────────────────────
   function resize() {
-    const w = container.offsetWidth || 800;
+    const w = container.offsetWidth || 900;
     renderer.setSize(w, H);
     camera.aspect = w / H;
     camera.updateProjectionMatrix();
@@ -490,109 +484,169 @@ function initCarViewer() {
   resize();
   new ResizeObserver(resize).observe(container);
 
-  // ── Materials — BasicMaterial: no lights needed, always visible ─
-  // Body fill: very dark red — just enough to read the silhouette
-  const bodyMat    = new THREE.MeshBasicMaterial({ color: 0x180606 });
-  const glassMat   = new THREE.MeshBasicMaterial({ color: 0x0a0a18, transparent: true, opacity: 0.6 });
-  const edgeRed    = new THREE.LineBasicMaterial({ color: 0xff3333 });
-  const edgeDim    = new THREE.LineBasicMaterial({ color: 0x991111 });
-  const emitRed    = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-  const emitDimRed = new THREE.MeshBasicMaterial({ color: 0x880000 });
+  // ── Materials ──────────────────────────────────────────────────
+  // DoubleSide handles any winding-order differences in extruded geo
+  const bodyMat    = new THREE.MeshBasicMaterial({ color: 0x1c0606, side: THREE.DoubleSide });
+  const edgeRed    = new THREE.LineBasicMaterial({ color: 0xff2222 });
+  const edgeDim    = new THREE.LineBasicMaterial({ color: 0x881111 });
   const scannerMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const emitRed    = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const emitDim    = new THREE.MeshBasicMaterial({ color: 0x550000 });
 
-  // ── Car group ──────────────────────────────────────────────────
   const car = new THREE.Group();
   scene.add(car);
 
-  /** Add a solid mesh plus clean edge lines at the same position */
-  function part(geo, mat, x, y, z, edgeMat) {
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, y, z);
-    car.add(mesh);
-    if (edgeMat) {
-      const lines = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
-      lines.position.set(x, y, z);
-      car.add(lines);
-    }
-  }
+  // ── Car body — extruded side profile ───────────────────────────
+  //
+  //  Coordinate system (all units ≈ metres):
+  //    X = car length  (front = +X, rear = -X)
+  //    Y = height from ground (ground = 0)
+  //    Z = car width   (extruded; centered after translate)
+  //
+  //  Key dimensions:
+  //    Arch centres:  front x=1.30, rear x=-1.10 ; both at y=0.38
+  //    Arch radius:   0.38 → arch bottom ≈ y=0.00 (touches ground)
+  //    Sill (between arches): y=0.38
+  //    Roof peak:     y=1.26
+  //
+  //  Profile is traced clockwise (DoubleSide mat handles the inversion).
+  //  absarc with clockwise=true sweeps DOWN from the sill, carving the
+  //  wheel-arch opening into the bottom of the body.
+  // ────────────────────────────────────────────────────────────────
 
-  // Lower body sill
-  part(new THREE.BoxGeometry(4.0, 0.70, 1.74), bodyMat, 0, 0.60, 0, edgeRed);
+  const profile = new THREE.Shape();
 
-  // Cabin
-  part(new THREE.BoxGeometry(2.05, 0.62, 1.62), bodyMat, -0.12, 1.25, 0, edgeRed);
+  // ── Bottom: front bumper base → wheel arches → rear bumper base ──
+  profile.moveTo( 2.00, 0.00);  // front bumper, ground
+  profile.lineTo( 1.68, 0.00);  // in front of front arch
+  profile.lineTo( 1.68, 0.38);  // rise to sill at arch entry
 
-  // Windscreen + rear screen
-  const screenGeo = new THREE.BoxGeometry(0.04, 0.50, 1.48);
-  part(screenGeo, glassMat, 0.88, 1.22, 0, null);
-  part(screenGeo, glassMat, -1.12, 1.22, 0, null);
+  // Front wheel arch — clockwise arc dips down through wheel space
+  // absarc(cx, cy, r, startAngle, endAngle, clockwise)
+  // CW from 0→π : (cx+r, cy) → lowest point (cx, cy-r) → (cx-r, cy)
+  profile.absarc( 1.30, 0.38, 0.38, 0, Math.PI, true);  // ends at (0.92, 0.38)
 
-  // Side windows
-  const sideWinGeo = new THREE.BoxGeometry(1.58, 0.38, 0.04);
-  part(sideWinGeo, glassMat, -0.12, 1.29,  0.825, null);
-  part(sideWinGeo, glassMat, -0.12, 1.29, -0.825, null);
+  profile.lineTo(-0.72, 0.38);  // sill panel between arches
 
-  // KITT scanner strip (front nose)
-  const scannerMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.055, 1.05), scannerMat);
-  scannerMesh.position.set(2.02, 0.50, 0);
-  car.add(scannerMesh);
+  // Rear wheel arch
+  profile.absarc(-1.10, 0.38, 0.38, 0, Math.PI, true);  // ends at (-1.48, 0.38)
 
-  // Front DRL headlights
-  const lightGeo = new THREE.BoxGeometry(0.04, 0.055, 0.22);
-  [-0.60, 0.60].forEach(z => {
-    const h = new THREE.Mesh(lightGeo, emitRed);
-    h.position.set(2.02, 0.65, z);
+  profile.lineTo(-1.48, 0.00);  // drop to ground
+  profile.lineTo(-2.00, 0.00);  // rear bumper, ground
+
+  // ── Rear end ──────────────────────────────────────────────────
+  profile.lineTo(-2.12, 0.15);
+  profile.lineTo(-2.12, 0.46);
+  profile.lineTo(-2.00, 0.62);  // rear upper body
+  profile.lineTo(-1.62, 0.80);
+  profile.lineTo(-1.10, 1.10);  // C-pillar base
+
+  // ── Roof ──────────────────────────────────────────────────────
+  profile.lineTo(-0.52, 1.26);  // roof peak
+  profile.lineTo( 0.60, 1.22);  // roof slope forward
+
+  // ── Windscreen + A-pillar ─────────────────────────────────────
+  profile.lineTo( 0.92, 0.90);  // A-pillar base (top of dash)
+  profile.lineTo( 1.12, 0.70);  // bonnet/scuttle
+
+  // ── Bonnet + front bumper face ─────────────────────────────────
+  profile.lineTo( 1.86, 0.62);
+  profile.lineTo( 2.12, 0.46);
+  profile.lineTo( 2.12, 0.15);
+  profile.lineTo( 2.00, 0.00);  // close
+
+  // Extrude 1.74 m wide, then centre on Z axis
+  const extruded = new THREE.ExtrudeGeometry(profile, { depth: 1.74, bevelEnabled: false });
+  extruded.translate(0, 0, -0.87);
+
+  car.add(new THREE.Mesh(extruded, bodyMat));
+
+  // Edge lines — threshold 15° suppresses triangulation diagonals
+  // on flat surfaces while keeping every real shape boundary visible
+  car.add(new THREE.LineSegments(new THREE.EdgesGeometry(extruded, 15), edgeRed));
+
+  // ── Door crease line (both sides) ─────────────────────────────
+  // A single horizontal score line suggesting the door aperture
+  [[0.87], [-0.87]].forEach(([z]) => {
+    const pts = [
+      new THREE.Vector3(-0.98, 0.66, z),
+      new THREE.Vector3( 0.84, 0.66, z),
+    ];
+    car.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), edgeDim));
+  });
+
+  // ── KITT scanner strip ─────────────────────────────────────────
+  const scanMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 1.12), scannerMat);
+  scanMesh.position.set(2.10, 0.26, 0);
+  car.add(scanMesh);
+
+  // ── Headlights ─────────────────────────────────────────────────
+  const litGeo = new THREE.BoxGeometry(0.05, 0.06, 0.22);
+  [-0.55, 0.55].forEach(z => {
+    const h = new THREE.Mesh(litGeo, emitRed);
+    h.position.set(2.10, 0.46, z);
     car.add(h);
   });
 
-  // Rear lights
-  [-0.60, 0.60].forEach(z => {
-    const h = new THREE.Mesh(lightGeo, emitDimRed);
-    h.position.set(-2.02, 0.65, z);
-    car.add(h);
-  });
+  // ── Rear lights ────────────────────────────────────────────────
+  // Full-width light bar — a signature EX30 detail
+  const rearBarGeo = new THREE.BoxGeometry(0.04, 0.045, 1.60);
+  const rearBar = new THREE.Mesh(rearBarGeo, emitDim);
+  rearBar.position.set(-2.12, 0.58, 0);
+  car.add(rearBar);
 
-  // Wheels — CylinderGeometry with rotation.x = PI/2 (axis along Z)
-  const WHEEL_R  = 0.29;
-  const wheelGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.22, 20);
+  // ── Wheels ─────────────────────────────────────────────────────
+  // CylinderGeometry default axis = Y; rotation.x = π/2 → axis along Z
+  const WHEEL_R = 0.30;
+  const WHEEL_W = 0.20;
+  const tyreGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, WHEEL_W, 28);
+  const hubGeo  = new THREE.CylinderGeometry(0.11, 0.11, WHEEL_W + 0.02, 8);
 
   [
-    [ 1.30, WHEEL_R,  0.93],
-    [ 1.30, WHEEL_R, -0.93],
-    [-1.15, WHEEL_R,  0.93],
-    [-1.15, WHEEL_R, -0.93],
+    [ 1.30, WHEEL_R,  0.87],
+    [ 1.30, WHEEL_R, -0.87],
+    [-1.10, WHEEL_R,  0.87],
+    [-1.10, WHEEL_R, -0.87],
   ].forEach(([x, y, z]) => {
-    const w = new THREE.Mesh(wheelGeo, new THREE.MeshBasicMaterial({ color: 0x0d0303 }));
-    w.position.set(x, y, z);
-    w.rotation.x = Math.PI / 2;
-    car.add(w);
+    // Tyre (dark)
+    const tyre = new THREE.Mesh(tyreGeo, new THREE.MeshBasicMaterial({ color: 0x0c0202 }));
+    tyre.position.set(x, y, z);
+    tyre.rotation.x = Math.PI / 2;
+    car.add(tyre);
 
-    const we = new THREE.LineSegments(new THREE.EdgesGeometry(wheelGeo), edgeDim);
-    we.position.set(x, y, z);
-    we.rotation.x = Math.PI / 2;
-    car.add(we);
+    // Tyre edge (dim)
+    const te = new THREE.LineSegments(new THREE.EdgesGeometry(tyreGeo, 25), edgeDim);
+    te.position.set(x, y, z);
+    te.rotation.x = Math.PI / 2;
+    car.add(te);
+
+    // Hub — bright rim ring
+    const hub = new THREE.Mesh(hubGeo, new THREE.MeshBasicMaterial({ color: 0x2a0808 }));
+    hub.position.set(x, y, z);
+    hub.rotation.x = Math.PI / 2;
+    car.add(hub);
+
+    const he = new THREE.LineSegments(new THREE.EdgesGeometry(hubGeo, 25), edgeRed);
+    he.position.set(x, y, z);
+    he.rotation.x = Math.PI / 2;
+    car.add(he);
   });
 
-  // Ground grid
-  scene.add(new THREE.GridHelper(18, 26, 0x330000, 0x1a0000));
+  // ── Ground grid ────────────────────────────────────────────────
+  scene.add(new THREE.GridHelper(20, 28, 0x2a0000, 0x160000));
 
-  // ── HUD rotation readout ────────────────────────────────────────
+  // ── HUD ────────────────────────────────────────────────────────
   const hudRotate = document.getElementById('hud-rotate');
-
-  // ── Animation loop ─────────────────────────────────────────────
   let t = 0;
 
   (function animate() {
     requestAnimationFrame(animate);
     t += 0.018;
-
     car.rotation.y += 0.004;
 
-    // Scanner pulse — drives both strip colour and a point light sweep
     const pulse = (Math.sin(t * 2.2) + 1) / 2;
-    scannerMat.color.setRGB(1.0, pulse * 0.05, 0);
+    scannerMat.color.setRGB(1.0, pulse * 0.04, 0);
 
-    // HUD readout
     if (hudRotate) {
       const deg = Math.round(((car.rotation.y % (Math.PI * 2)) * 180 / Math.PI + 360) % 360);
       hudRotate.textContent = `ROT ${String(deg).padStart(3, '0')}°`;
