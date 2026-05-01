@@ -1,0 +1,654 @@
+/* ============================================================
+   volvo-ex30.css — Knight Rider Dashboard for Volvo EX30
+   Dark futuristic UI with red neon accents.
+
+   Structure:
+     1.  Design tokens
+     2.  Reset & base
+     3.  Dashboard container
+     4.  Header & vehicle identity
+     5.  KITT scanner bar animation
+     6.  Cards grid & loading state
+     7.  Individual card styles
+     8.  Battery bar
+     9.  Status badges
+     10. Footer
+     11. Responsive breakpoints
+   ============================================================ */
+
+
+/* ── 1. Design Tokens ───────────────────────────────────────── */
+:root {
+  /* Background layers */
+  --bg:             #060606;
+  --bg-card:        #0e0e0e;
+  --bg-card-hover:  #131313;
+  --bg-icon:        #1a0000;
+
+  /* Red neon palette */
+  --red:            #ff1a1a;
+  --red-mid:        #cc0000;
+  --red-dim:        #880000;
+  --red-deep:       #1a0000;
+  --red-glow:       rgba(255, 26, 26, 0.22);
+  --red-glow-soft:  rgba(255, 26, 26, 0.08);
+
+  /* Borders */
+  --border:         #1c0000;
+  --border-hover:   #550000;
+
+  /* Text */
+  --text:           #e8e8e8;
+  --text-sub:       #888888;
+  --text-label:     #555555;
+
+  /* Misc */
+  --font-mono:      'Courier New', 'Lucida Console', monospace;
+  --font-ui:        -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius-sm:      6px;
+  --radius:         10px;
+  --radius-lg:      14px;
+  --transition:     0.2s ease;
+}
+
+
+/* ── 2. Reset & Base ────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html { font-size: 16px; }
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  overflow-x: hidden;
+
+  /*
+    Layered background:
+      a) Subtle red grid lines  →  sci-fi HUD feel
+      b) Faint scanlines        →  CRT display nostalgia
+  */
+  background-image:
+    linear-gradient(rgba(180, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180, 0, 0, 0.04) 1px, transparent 1px),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0, 0, 0, 0.12) 3px,
+      rgba(0, 0, 0, 0.12) 4px
+    );
+  background-size: 48px 48px, 48px 48px, 100% 4px;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+
+/* ── 3. Dashboard Container ─────────────────────────────────── */
+.dashboard {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 16px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+
+/* ── 4. Header & Vehicle Identity ───────────────────────────── */
+.dash-header {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+
+  /* Ambient red glow around the header */
+  box-shadow:
+    0 0 40px rgba(180, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Volvo circle icon */
+.vehicle-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-mark {
+  flex-shrink: 0;
+}
+
+.volvo-icon {
+  width: 44px;
+  height: 44px;
+  color: var(--red);
+  filter: drop-shadow(0 0 8px var(--red));
+}
+
+/* VOLVO / EX30 text stacked */
+.vehicle-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brand {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--text-label);
+  text-transform: uppercase;
+}
+
+.model {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--red);
+  text-shadow: 0 0 12px var(--red), 0 0 28px rgba(255, 26, 26, 0.4);
+}
+
+/* Colour · year shown below model name */
+.vehicle-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-label);
+  margin-top: 2px;
+}
+
+/* Live / Demo / Offline pill */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--text-label);
+  user-select: none;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-label);
+  transition: background var(--transition), box-shadow var(--transition);
+  flex-shrink: 0;
+}
+
+/* Green-ish: live API data */
+.status-dot.live {
+  background: #00cc66;
+  box-shadow: 0 0 6px #00cc66, 0 0 14px rgba(0, 204, 102, 0.5);
+  animation: dot-pulse 2.5s ease-in-out infinite;
+}
+
+/* Amber: mock / demo data */
+.status-dot.mock {
+  background: #ff9900;
+  box-shadow: 0 0 6px #ff9900;
+}
+
+/* Grey: offline / error */
+.status-dot.error {
+  background: #444;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+
+/* ── 5. KITT Scanner Bar ─────────────────────────────────────── */
+.scanner-container {
+  width: 100%;
+}
+
+.scanner-track {
+  position: relative;
+  width: 100%;
+  height: 22px;
+  border-radius: 11px;
+  overflow: hidden;
+
+  /* Dark red base with LED-segment texture */
+  background-color: #0a0000;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0px,
+    transparent 10px,
+    rgba(0, 0, 0, 0.55) 10px,
+    rgba(0, 0, 0, 0.55) 12px
+  );
+
+  border: 1px solid #1e0000;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+/*
+  The glowing light that sweeps left ↔ right.
+  The gradient fades to transparent at the edges so it blends
+  naturally with the dark LED segments.
+  animation-direction: alternate causes it to bounce back and forth
+  without a visible "jump" reset.
+*/
+.scanner-light {
+  position: absolute;
+  top: -12px;
+  left: -70px;             /* Start with centre at left edge   */
+  width: 140px;
+  height: 46px;
+
+  background: radial-gradient(
+    ellipse at center,
+    #ffffff    0%,
+    #ff8888   12%,
+    #ff2222   28%,
+    #cc0000   48%,
+    transparent 72%
+  );
+
+  border-radius: 50%;
+  filter: blur(1.5px);
+
+  animation: kitt-sweep 2s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+/*
+  Movement: centre of light travels from x=0 to x=100% of track.
+  calc(100% - 70px) positions left edge so centre aligns with right edge.
+*/
+@keyframes kitt-sweep {
+  0%   { left: -70px; }
+  100% { left: calc(100% - 70px); }
+}
+
+
+/* ── 6. Cards Grid & Loading ────────────────────────────────── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+/* Centered loading spinner shown before first data load */
+.cards-loading {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 56px 24px;
+  color: var(--text-label);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.cards-loading.hidden {
+  display: none;
+}
+
+/* Spinning ring */
+.loader-ring {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--red-deep);
+  border-top-color: var(--red);
+  animation: spin 0.75s linear infinite;
+  box-shadow: 0 0 14px var(--red-glow);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* ── 7. Individual Card Styles ──────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  /* Subtle entrance — cards fade in after JS renders them */
+  animation: card-in 0.35s ease both;
+
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    background var(--transition);
+
+  position: relative;
+  overflow: hidden;
+}
+
+/* Thin red top-edge highlight */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 20%; right: 20%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--red-dim), transparent);
+  opacity: 0.5;
+}
+
+.card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
+  box-shadow: 0 0 22px var(--red-glow), 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Card header row: icon + label */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-icon {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-icon);
+  border-radius: var(--radius-sm);
+  color: var(--red);
+  flex-shrink: 0;
+  border: 1px solid #2a0000;
+}
+
+.card-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.card-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--text-label);
+  text-transform: uppercase;
+}
+
+/* Primary value — large number or short text */
+.card-value {
+  font-family: var(--font-mono);
+  font-size: 38px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.card-value .unit {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-sub);
+  margin-left: 3px;
+  letter-spacing: 0;
+}
+
+/* Secondary / detail line */
+.card-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-sub);
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+}
+
+/* Smaller font for long-text values (location, timestamp) */
+.card-value--text {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+  color: var(--text-sub);
+  word-break: break-word;
+}
+
+/* Time portion of sync card */
+.sync-time {
+  font-size: 38px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.sync-date {
+  font-size: 11px;
+  color: var(--text-sub);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+
+/* ── 8. Battery Bar ─────────────────────────────────────────── */
+.battery-bar-track {
+  height: 5px;
+  background: var(--red-deep);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.battery-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  /* Default: healthy charge level */
+  background: linear-gradient(to right, #cc0000, #ff2222, #ff5555);
+  box-shadow: 0 0 8px var(--red);
+  transition: width 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* 20–50 % — amber warning */
+.battery-bar-fill.low {
+  background: linear-gradient(to right, #aa5500, #ff9900, #ffbb33);
+  box-shadow: 0 0 8px rgba(255, 153, 0, 0.6);
+}
+
+/* < 20 % — critical, pulsing */
+.battery-bar-fill.critical {
+  background: linear-gradient(to right, #660000, #cc0000);
+  box-shadow: 0 0 8px rgba(200, 0, 0, 0.8);
+  animation: bar-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes bar-pulse {
+  from { opacity: 0.5; }
+  to   { opacity: 1; }
+}
+
+
+/* ── 9. Status Badges ───────────────────────────────────────── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.status-badge.charging {
+  color: #00e676;
+  border-color: rgba(0, 230, 118, 0.35);
+  background: rgba(0, 230, 118, 0.07);
+}
+
+.status-badge.plugged-in {
+  color: #ffaa00;
+  border-color: rgba(255, 170, 0, 0.35);
+  background: rgba(255, 170, 0, 0.07);
+}
+
+.status-badge.not-charging {
+  color: var(--text-sub);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: transparent;
+}
+
+.status-badge.locked {
+  color: #00cc66;
+  border-color: rgba(0, 204, 102, 0.35);
+  background: rgba(0, 204, 102, 0.07);
+}
+
+.status-badge.unlocked {
+  color: #ff4444;
+  border-color: rgba(255, 68, 68, 0.35);
+  background: rgba(255, 68, 68, 0.07);
+}
+
+
+/* ── 10. Footer ─────────────────────────────────────────────── */
+.dash-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid var(--red-dim);
+  border-radius: var(--radius-sm);
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  transition: background var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+
+.refresh-btn:hover {
+  background: var(--red-glow-soft);
+  border-color: var(--red);
+  box-shadow: 0 0 14px var(--red-glow);
+}
+
+.refresh-btn:active {
+  transform: scale(0.97);
+}
+
+.refresh-btn svg {
+  flex-shrink: 0;
+  transition: transform 0.5s ease;
+}
+
+/* Class added while fetch is in-flight */
+.refresh-btn.spinning svg {
+  animation: spin 0.7s linear infinite;
+}
+
+.footer-tagline {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  color: var(--red-dim);
+  text-shadow: 0 0 10px var(--red-dim);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+
+/* ── 11. Responsive Breakpoints ─────────────────────────────── */
+
+/* Tablet (≤ 720 px) — two-column grid */
+@media (max-width: 720px) {
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .card-value {
+    font-size: 30px;
+  }
+
+  .sync-time {
+    font-size: 30px;
+  }
+
+  .model {
+    font-size: 22px;
+  }
+}
+
+/* Mobile (≤ 460 px) — single-column grid */
+@media (max-width: 460px) {
+  .dashboard {
+    padding: 16px 12px 40px;
+  }
+
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dash-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .card-value {
+    font-size: 32px;
+  }
+}

@@ -1,0 +1,105 @@
+<!--
+  Volvo EX30 — Knight Rider Dashboard
+  =====================================
+  A static, single-page vehicle status dashboard styled after KITT from Knight Rider.
+  Hosted as an Azure Static Web App.
+
+  Data source: /.api/vehicle-status (Azure Function — see volvo-ex30.js)
+  Falls back to mock data if the API is unavailable.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Knight Rider-style vehicle status dashboard for the Volvo EX30." />
+  <title>EX30 — Vehicle Dashboard</title>
+  <link rel="stylesheet" href="volvo-ex30.css" />
+</head>
+<body>
+
+  <div class="dashboard">
+
+    <!-- ══════════════════════════════════════════
+         Header — Vehicle identity + KITT scanner
+         ══════════════════════════════════════════ -->
+    <header class="dash-header">
+
+      <div class="header-top">
+
+        <!-- Vehicle branding -->
+        <div class="vehicle-identity">
+          <div class="brand-mark" aria-hidden="true">
+            <!-- Minimal Volvo-style circle mark -->
+            <svg class="volvo-icon" viewBox="0 0 44 44">
+              <circle cx="22" cy="22" r="19" fill="none" stroke="currentColor" stroke-width="2.5"/>
+              <text x="22" y="29" text-anchor="middle" font-size="16" font-weight="800"
+                    font-family="'Courier New', monospace" fill="currentColor">V</text>
+            </svg>
+          </div>
+          <div class="vehicle-name">
+            <span class="brand">VOLVO</span>
+            <span class="model">EX30</span>
+          </div>
+          <div class="vehicle-meta" id="vehicle-meta">
+            <!-- Populated by JS: colour · model year -->
+          </div>
+        </div>
+
+        <!-- Live / mock / offline indicator -->
+        <div class="connection-status" id="connection-status" aria-live="polite" aria-atomic="true">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">CONNECTING…</span>
+        </div>
+
+      </div>
+
+      <!-- KITT-style animated scanner bar -->
+      <div class="scanner-container" aria-hidden="true" role="presentation">
+        <div class="scanner-track">
+          <div class="scanner-light"></div>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- ══════════════════════════════════════════
+         Main — Dashboard cards (rendered by JS)
+         ══════════════════════════════════════════ -->
+    <main class="cards-grid" id="cards-grid" aria-label="Vehicle status dashboard">
+
+      <!-- Loading state — hidden once data arrives -->
+      <div class="cards-loading" id="cards-loading" role="status" aria-live="polite">
+        <div class="loader-ring"></div>
+        <p>Loading vehicle data…</p>
+      </div>
+
+    </main>
+
+    <!-- ══════════════════════════════════════════
+         Footer
+         ══════════════════════════════════════════ -->
+    <footer class="dash-footer">
+
+      <button class="refresh-btn" id="refresh-btn" type="button" aria-label="Refresh vehicle data">
+        <!-- Refresh icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        REFRESH
+      </button>
+
+      <span class="footer-tagline" aria-hidden="true">K.I.T.T. MODE ACTIVE</span>
+
+    </footer>
+
+  </div><!-- /.dashboard -->
+
+  <script src="volvo-ex30.js"></script>
+
+</body>
+</html>
