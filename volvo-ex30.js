@@ -465,7 +465,8 @@ function initCarViewer() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x060606);
   // Subtle depth fog
-  scene.fog = new THREE.FogExp2(0x060606, 0.045);
+  // Very gentle fog — just enough to soften the far grid edges
+  scene.fog = new THREE.FogExp2(0x060606, 0.006);
 
   // ── Camera ─────────────────────────────────────────────────────
   const camera = new THREE.PerspectiveCamera(36, W / H, 0.1, 60);
@@ -478,8 +479,8 @@ function initCarViewer() {
   renderer.setSize(W, H);
 
   // ── Lights ─────────────────────────────────────────────────────
-  // Minimal ambient so the body stays dark
-  scene.add(new THREE.AmbientLight(0x0a0000, 5));
+  // Enough ambient to show the body silhouette against the dark background
+  scene.add(new THREE.AmbientLight(0x220000, 6));
 
   // Sweeping underglow — follows scanner pulse
   const underglow = new THREE.PointLight(0xff1100, 6, 7);
@@ -487,20 +488,20 @@ function initCarViewer() {
   scene.add(underglow);
 
   // Rim light from behind-left for silhouette
-  const rimLight = new THREE.DirectionalLight(0xff4422, 0.9);
+  const rimLight = new THREE.DirectionalLight(0xff4422, 2.5);
   rimLight.position.set(-5, 5, -3);
   scene.add(rimLight);
 
   // Faint fill from front-right
-  const fillLight = new THREE.DirectionalLight(0xff2200, 0.3);
+  const fillLight = new THREE.DirectionalLight(0xff2200, 1.0);
   fillLight.position.set(5, 3, 4);
   scene.add(fillLight);
 
   // ── Materials ──────────────────────────────────────────────────
   const bodyMat    = new THREE.MeshPhongMaterial({ color: 0x050505, shininess: 90, specular: 0x440000 });
   const glassMat   = new THREE.MeshPhongMaterial({ color: 0x07070f, shininess: 140, transparent: true, opacity: 0.78, specular: 0x222255 });
-  const edgeRed    = new THREE.LineBasicMaterial({ color: 0xff2222 });
-  const edgeDim    = new THREE.LineBasicMaterial({ color: 0x660000 });
+  const edgeRed    = new THREE.LineBasicMaterial({ color: 0xff3333 });
+  const edgeDim    = new THREE.LineBasicMaterial({ color: 0x880000 });
   const emitRed    = new THREE.MeshBasicMaterial({ color: 0xff0000 });
   const emitDimRed = new THREE.MeshBasicMaterial({ color: 0x770000 });
   // Scanner material — color is animated each frame
