@@ -64,6 +64,22 @@
     </header>
 
     <!-- ══════════════════════════════════════════
+         3D — Rotating Knight Rider car view
+         ══════════════════════════════════════════ -->
+    <section class="car-viewer-section" aria-label="3D vehicle view">
+      <div class="car-viewer" id="car-viewer">
+        <canvas id="car-canvas"></canvas>
+        <!-- Corner HUD labels -->
+        <div class="hud-label hud-tl" aria-hidden="true">VOLVO EX30</div>
+        <div class="hud-label hud-tr" aria-hidden="true">3D SCAN</div>
+        <div class="hud-label hud-bl" aria-hidden="true">
+          <span class="hud-blink">■</span> KITT MODE
+        </div>
+        <div class="hud-label hud-br" aria-hidden="true" id="hud-rotate">ROT 000°</div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════
          Main — Dashboard cards (rendered by JS)
          ══════════════════════════════════════════ -->
     <main class="cards-grid" id="cards-grid" aria-label="Vehicle status dashboard">
@@ -111,6 +127,8 @@
 
   </div><!-- /.dashboard -->
 
+  <!-- Three.js — UMD build exposes global THREE, no build step needed -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.min.js"></script>
   <script src="volvo-ex30.js"></script>
 
 </body>
