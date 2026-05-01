@@ -661,10 +661,9 @@ button {
   line-height: 0;       /* removes phantom gap below canvas */
 }
 
+/* Three.js fully controls canvas size — no CSS overrides */
 #car-canvas {
   display: block;
-  width: 100% !important;
-  height: 300px;
 }
 
 /* HUD corner labels — translucent monospaced text overlays */

@@ -438,117 +438,106 @@ function playKittSound() {
 
 /* ── 3D Car Viewer ───────────────────────────────────────────────
    Builds a Knight Rider-style wireframe/neon model of the EX30
-   using Three.js (loaded from CDN as a global).
+   using Three.js (loaded from CDN as a global THREE).
 
-   Car anatomy (all dims in Three.js units ≈ metres):
-     • Lower body sill  — 4.0 × 0.70 × 1.74
-     • Cabin            — 2.05 × 0.62 × 1.62
-     • Windscreen / rear glass — thin dark boxes
-     • Side windows     — translucent dark panels
-     • KITT scanner bar — emissive red strip, pulsing
-     • Headlights / rear lights — small emissive quads
-     • Wheels           — CylinderGeometry, axis along Z
-     • Grid floor       — dark red GridHelper
-
-   The scanner pulse also drives the underglow point light,
-   which sweeps left-right in sync.
+   Three.js creates and owns the canvas element so its internal
+   size tracking never conflicts with CSS.  The scene uses only
+   MeshBasicMaterial and LineBasicMaterial — no lights required —
+   so nothing can be "too dark to see".
    ─────────────────────────────────────────────────────────── */
 function initCarViewer() {
-  const canvas = document.getElementById('car-canvas');
-  if (!canvas || typeof THREE === 'undefined') return;
+  if (typeof THREE === 'undefined') {
+    console.warn('[EX30] Three.js not loaded — 3D viewer disabled.');
+    return;
+  }
 
-  const container = canvas.parentElement;
-  const W = container.clientWidth || 800;
-  const H = 300;  // matches CSS height
+  const container = document.getElementById('car-viewer');
+  if (!container) return;
+
+  const H = 300;
 
   // ── Scene ──────────────────────────────────────────────────────
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x060606);
-  // Subtle depth fog
-  // Very gentle fog — just enough to soften the far grid edges
-  scene.fog = new THREE.FogExp2(0x060606, 0.006);
 
   // ── Camera ─────────────────────────────────────────────────────
-  const camera = new THREE.PerspectiveCamera(36, W / H, 0.1, 60);
+  // Aspect is set properly in resize() below
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
   camera.position.set(4.8, 2.6, 4.8);
   camera.lookAt(0, 0.8, 0);
 
   // ── Renderer ───────────────────────────────────────────────────
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // Let Three.js create the canvas so it fully controls canvas dimensions.
+  // We then insert it into the DOM and remove the static placeholder.
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(W, H);
 
-  // ── Lights ─────────────────────────────────────────────────────
-  // Enough ambient to show the body silhouette against the dark background
-  scene.add(new THREE.AmbientLight(0x220000, 6));
+  // Swap placeholder canvas for Three.js-managed one
+  const placeholder = document.getElementById('car-canvas');
+  if (placeholder) placeholder.remove();
+  renderer.domElement.id = 'car-canvas';
+  renderer.domElement.style.display = 'block';
+  // Insert before HUD labels
+  container.insertBefore(renderer.domElement, container.firstChild);
 
-  // Sweeping underglow — follows scanner pulse
-  const underglow = new THREE.PointLight(0xff1100, 6, 7);
-  underglow.position.set(0, 0.1, 0);
-  scene.add(underglow);
+  // ── Resize helper ──────────────────────────────────────────────
+  function resize() {
+    const w = container.offsetWidth || 800;
+    renderer.setSize(w, H);
+    camera.aspect = w / H;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  new ResizeObserver(resize).observe(container);
 
-  // Rim light from behind-left for silhouette
-  const rimLight = new THREE.DirectionalLight(0xff4422, 2.5);
-  rimLight.position.set(-5, 5, -3);
-  scene.add(rimLight);
-
-  // Faint fill from front-right
-  const fillLight = new THREE.DirectionalLight(0xff2200, 1.0);
-  fillLight.position.set(5, 3, 4);
-  scene.add(fillLight);
-
-  // ── Materials ──────────────────────────────────────────────────
-  const bodyMat    = new THREE.MeshPhongMaterial({ color: 0x050505, shininess: 90, specular: 0x440000 });
-  const glassMat   = new THREE.MeshPhongMaterial({ color: 0x07070f, shininess: 140, transparent: true, opacity: 0.78, specular: 0x222255 });
+  // ── Materials — BasicMaterial: no lights needed, always visible ─
+  // Body fill: very dark red — just enough to read the silhouette
+  const bodyMat    = new THREE.MeshBasicMaterial({ color: 0x180606 });
+  const glassMat   = new THREE.MeshBasicMaterial({ color: 0x0a0a18, transparent: true, opacity: 0.6 });
   const edgeRed    = new THREE.LineBasicMaterial({ color: 0xff3333 });
-  const edgeDim    = new THREE.LineBasicMaterial({ color: 0x880000 });
+  const edgeDim    = new THREE.LineBasicMaterial({ color: 0x991111 });
   const emitRed    = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-  const emitDimRed = new THREE.MeshBasicMaterial({ color: 0x770000 });
-  // Scanner material — color is animated each frame
+  const emitDimRed = new THREE.MeshBasicMaterial({ color: 0x880000 });
   const scannerMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 
-  // ── Helpers ────────────────────────────────────────────────────
+  // ── Car group ──────────────────────────────────────────────────
   const car = new THREE.Group();
   scene.add(car);
 
-  /** Add a mesh + optional edge lines to the car group */
+  /** Add a solid mesh plus clean edge lines at the same position */
   function part(geo, mat, x, y, z, edgeMat) {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    car.add(m);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    car.add(mesh);
     if (edgeMat) {
-      const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
-      e.position.set(x, y, z);
-      car.add(e);
+      const lines = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+      lines.position.set(x, y, z);
+      car.add(lines);
     }
-    return m;
   }
 
-  // ── Body ───────────────────────────────────────────────────────
-  const sillGeo  = new THREE.BoxGeometry(4.0, 0.70, 1.74);
-  part(sillGeo, bodyMat, 0, 0.60, 0, edgeRed);
+  // Lower body sill
+  part(new THREE.BoxGeometry(4.0, 0.70, 1.74), bodyMat, 0, 0.60, 0, edgeRed);
 
-  const cabinGeo = new THREE.BoxGeometry(2.05, 0.62, 1.62);
-  part(cabinGeo, bodyMat, -0.12, 1.25, 0, edgeRed);
+  // Cabin
+  part(new THREE.BoxGeometry(2.05, 0.62, 1.62), bodyMat, -0.12, 1.25, 0, edgeRed);
 
-  // ── Glass ──────────────────────────────────────────────────────
-  // Windscreen + rear screen (thin box, near-vertical)
+  // Windscreen + rear screen
   const screenGeo = new THREE.BoxGeometry(0.04, 0.50, 1.48);
-  part(screenGeo, glassMat, 0.88, 1.22, 0, null);   // front
-  part(screenGeo, glassMat, -1.12, 1.22, 0, null);  // rear
+  part(screenGeo, glassMat, 0.88, 1.22, 0, null);
+  part(screenGeo, glassMat, -1.12, 1.22, 0, null);
 
-  // Side windows (flat panels each side)
+  // Side windows
   const sideWinGeo = new THREE.BoxGeometry(1.58, 0.38, 0.04);
   part(sideWinGeo, glassMat, -0.12, 1.29,  0.825, null);
   part(sideWinGeo, glassMat, -0.12, 1.29, -0.825, null);
 
-  // ── KITT Scanner bar (front nose) ──────────────────────────────
-  const scannerGeo  = new THREE.BoxGeometry(0.06, 0.055, 1.05);
-  const scannerMesh = new THREE.Mesh(scannerGeo, scannerMat);
+  // KITT scanner strip (front nose)
+  const scannerMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.055, 1.05), scannerMat);
   scannerMesh.position.set(2.02, 0.50, 0);
   car.add(scannerMesh);
 
-  // ── Headlights (DRL-style strips) ──────────────────────────────
+  // Front DRL headlights
   const lightGeo = new THREE.BoxGeometry(0.04, 0.055, 0.22);
   [-0.60, 0.60].forEach(z => {
     const h = new THREE.Mesh(lightGeo, emitRed);
@@ -556,27 +545,24 @@ function initCarViewer() {
     car.add(h);
   });
 
-  // Rear lights — dimmer
+  // Rear lights
   [-0.60, 0.60].forEach(z => {
     const h = new THREE.Mesh(lightGeo, emitDimRed);
     h.position.set(-2.02, 0.65, z);
     car.add(h);
   });
 
-  // ── Wheels ─────────────────────────────────────────────────────
-  // CylinderGeometry default axis = Y.
-  // rotation.x = PI/2  →  axis becomes Z  (left-right through car)
+  // Wheels — CylinderGeometry with rotation.x = PI/2 (axis along Z)
   const WHEEL_R  = 0.29;
   const wheelGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.22, 20);
-  const wheelMat = new THREE.MeshPhongMaterial({ color: 0x080808, shininess: 40 });
 
   [
-    [ 1.30, WHEEL_R, 0.93],
-    [ 1.30, WHEEL_R,-0.93],
-    [-1.15, WHEEL_R, 0.93],
-    [-1.15, WHEEL_R,-0.93],
+    [ 1.30, WHEEL_R,  0.93],
+    [ 1.30, WHEEL_R, -0.93],
+    [-1.15, WHEEL_R,  0.93],
+    [-1.15, WHEEL_R, -0.93],
   ].forEach(([x, y, z]) => {
-    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    const w = new THREE.Mesh(wheelGeo, new THREE.MeshBasicMaterial({ color: 0x0d0303 }));
     w.position.set(x, y, z);
     w.rotation.x = Math.PI / 2;
     car.add(w);
@@ -587,9 +573,8 @@ function initCarViewer() {
     car.add(we);
   });
 
-  // ── Ground grid ────────────────────────────────────────────────
-  const grid = new THREE.GridHelper(18, 26, 0x1a0000, 0x0b0000);
-  scene.add(grid);
+  // Ground grid
+  scene.add(new THREE.GridHelper(18, 26, 0x330000, 0x1a0000));
 
   // ── HUD rotation readout ────────────────────────────────────────
   const hudRotate = document.getElementById('hud-rotate');
@@ -601,20 +586,13 @@ function initCarViewer() {
     requestAnimationFrame(animate);
     t += 0.018;
 
-    // Slow, continuous rotation
     car.rotation.y += 0.004;
 
-    // Keep scanner pulse in sync with the CSS scanner bar speed (~2s period)
-    const pulse = (Math.sin(t * 2.2) + 1) / 2;  // 0 → 1 → 0
-
-    // Animate the emissive scanner strip colour
+    // Scanner pulse — drives both strip colour and a point light sweep
+    const pulse = (Math.sin(t * 2.2) + 1) / 2;
     scannerMat.color.setRGB(1.0, pulse * 0.05, 0);
 
-    // Sweep underglow left/right matching scanner pulse
-    underglow.position.x = Math.sin(t * 2.2) * 1.8;
-    underglow.intensity  = 3 + pulse * 6;
-
-    // Update HUD rotation readout (degrees, 0-359)
+    // HUD readout
     if (hudRotate) {
       const deg = Math.round(((car.rotation.y % (Math.PI * 2)) * 180 / Math.PI + 360) % 360);
       hudRotate.textContent = `ROT ${String(deg).padStart(3, '0')}°`;
@@ -622,14 +600,6 @@ function initCarViewer() {
 
     renderer.render(scene, camera);
   })();
-
-  // ── Responsive resize ──────────────────────────────────────────
-  new ResizeObserver(() => {
-    const nW = container.clientWidth;
-    camera.aspect = nW / H;
-    camera.updateProjectionMatrix();
-    renderer.setSize(nW, H);
-  }).observe(container);
 }
 
 
